@@ -1,0 +1,313 @@
+// Question bank grouped by material id. A real backend would generate these with the AI layer.
+export const mockQuestionBank = {
+  'data-structures': [
+    {
+      id: 'ds-q1',
+      topic: 'BST Operations',
+      difficulty: 'easy',
+      question: 'Where is a new key inserted in a binary search tree?',
+      options: [
+        'At the root, pushing the old root down',
+        'As a leaf, after comparing with each node on the path',
+        'At the first empty slot found level by level',
+        'Anywhere, the tree is rebalanced afterwards',
+      ],
+      answer: 1,
+      explanation:
+        'Insertion walks down from the root comparing keys and attaches the new node as a leaf, which keeps the ordering property intact.',
+    },
+    {
+      id: 'ds-q2',
+      topic: 'Tree Traversal',
+      difficulty: 'easy',
+      question: 'Which traversal of a BST outputs keys in ascending order?',
+      options: ['Pre-order', 'In-order', 'Post-order', 'Level-order'],
+      answer: 1,
+      explanation: 'In-order visits left, node, right — which matches the BST ordering.',
+    },
+    {
+      id: 'ds-q3',
+      topic: 'Tree Traversal',
+      difficulty: 'medium',
+      question: 'Which traversal is used to delete every node of a tree safely?',
+      options: ['Pre-order', 'In-order', 'Post-order', 'Level-order'],
+      answer: 2,
+      explanation: 'Post-order frees both children before the parent, so no pointer is used after being released.',
+    },
+    {
+      id: 'ds-q4',
+      topic: 'Graph Traversal',
+      difficulty: 'medium',
+      question: 'Which data structure does breadth-first search rely on?',
+      options: ['Stack', 'Queue', 'Priority queue', 'Hash table'],
+      answer: 1,
+      explanation: 'BFS visits nodes level by level, so it needs FIFO ordering from a queue.',
+    },
+    {
+      id: 'ds-q5',
+      topic: 'Graph Traversal',
+      difficulty: 'hard',
+      question: 'What is the time complexity of DFS on a graph stored as an adjacency list?',
+      options: ['O(V)', 'O(V + E)', 'O(V log V)', 'O(V²)'],
+      answer: 1,
+      explanation: 'Every vertex is visited once and every edge is examined once, giving O(V + E).',
+    },
+    {
+      id: 'ds-q6',
+      topic: 'Sorting & Searching',
+      difficulty: 'easy',
+      question: 'What is the worst case time complexity of quick sort?',
+      options: ['O(n)', 'O(n log n)', 'O(n²)', 'O(log n)'],
+      answer: 2,
+      explanation: 'Repeatedly picking the smallest or largest element as pivot creates fully unbalanced partitions.',
+    },
+    {
+      id: 'ds-q7',
+      topic: 'Sorting & Searching',
+      difficulty: 'medium',
+      question: 'Binary search requires the input to be…',
+      options: ['Unique', 'Sorted', 'Stored in a linked list', 'Of even length'],
+      answer: 1,
+      explanation: 'Halving the search space only works when the order tells you which half to discard.',
+    },
+    {
+      id: 'ds-q8',
+      topic: 'Hashing',
+      difficulty: 'medium',
+      question: 'Open addressing resolves collisions by…',
+      options: [
+        'Storing colliding keys in a linked list',
+        'Probing for another free slot in the same table',
+        'Growing the key length',
+        'Rejecting the second key',
+      ],
+      answer: 1,
+      explanation: 'Linear, quadratic or double-hash probing searches the table itself for a free slot.',
+    },
+    {
+      id: 'ds-q9',
+      topic: 'BST Operations',
+      difficulty: 'hard',
+      question: 'When deleting a node with two children, which node replaces it?',
+      options: [
+        'Its left child',
+        'Its right child',
+        'Its in-order successor or predecessor',
+        'The deepest leaf',
+      ],
+      answer: 2,
+      explanation: 'The in-order successor (smallest key in the right subtree) keeps the ordering valid.',
+    },
+    {
+      id: 'ds-q10',
+      topic: 'Binary Trees',
+      difficulty: 'easy',
+      question: 'How many nodes does a complete binary tree of height h hold at most?',
+      options: ['2h', 'h²', '2^(h+1) − 1', 'h log h'],
+      answer: 2,
+      explanation: 'Each level doubles, so the totals form the geometric series 1 + 2 + 4 + … = 2^(h+1) − 1.',
+    },
+  ],
+  dbms: [
+    {
+      id: 'db-q1',
+      topic: 'Normalisation',
+      difficulty: 'easy',
+      question: 'A relation is in 1NF when…',
+      options: [
+        'Every attribute holds a single atomic value',
+        'There are no transitive dependencies',
+        'Every determinant is a candidate key',
+        'All partial dependencies are removed',
+      ],
+      answer: 0,
+      explanation: 'First normal form only asks for atomic, non-repeating attribute values.',
+    },
+    {
+      id: 'db-q2',
+      topic: 'Transactions & ACID',
+      difficulty: 'medium',
+      question: 'Durability guarantees that…',
+      options: [
+        'Transactions never conflict',
+        'Committed changes survive a crash',
+        'Reads always see the latest write',
+        'Each transaction runs alone',
+      ],
+      answer: 1,
+      explanation: 'Once committed, the change is written to stable storage and survives failure.',
+    },
+    {
+      id: 'db-q3',
+      topic: 'SQL Queries',
+      difficulty: 'easy',
+      question: 'Which clause removes duplicate rows from a result?',
+      options: ['GROUP BY', 'DISTINCT', 'UNIQUE', 'HAVING'],
+      answer: 1,
+      explanation: 'DISTINCT drops duplicate rows from the projected result.',
+    },
+    {
+      id: 'db-q4',
+      topic: 'Indexing',
+      difficulty: 'medium',
+      question: 'How many clustered indexes can a table have?',
+      options: ['One', 'Two', 'One per column', 'Unlimited'],
+      answer: 0,
+      explanation: 'A clustered index defines the physical row order, so there can only be one.',
+    },
+    {
+      id: 'db-q5',
+      topic: 'Concurrency Control',
+      difficulty: 'hard',
+      question: 'Two-phase locking guarantees…',
+      options: ['Deadlock freedom', 'Conflict serialisability', 'No dirty reads only', 'Faster commits'],
+      answer: 1,
+      explanation: 'A growing phase followed by a shrinking phase produces a conflict-serialisable schedule, though deadlocks are still possible.',
+    },
+    {
+      id: 'db-q6',
+      topic: 'Relational Algebra',
+      difficulty: 'medium',
+      question: 'Which operator keeps only the rows that satisfy a condition?',
+      options: ['Projection (π)', 'Selection (σ)', 'Join (⋈)', 'Rename (ρ)'],
+      answer: 1,
+      explanation: 'Selection filters rows; projection picks columns.',
+    },
+  ],
+  'operating-systems': [
+    {
+      id: 'os-q1',
+      topic: 'CPU Scheduling',
+      difficulty: 'easy',
+      question: 'Which scheduling policy gives the lowest average waiting time?',
+      options: ['FCFS', 'Shortest Job First', 'Round Robin', 'Priority with ageing'],
+      answer: 1,
+      explanation: 'SJF is provably optimal for average waiting time, though it needs burst times in advance.',
+    },
+    {
+      id: 'os-q2',
+      topic: 'Deadlocks',
+      difficulty: 'medium',
+      question: 'The Banker’s algorithm is used for deadlock…',
+      options: ['Detection', 'Avoidance', 'Prevention', 'Recovery'],
+      answer: 1,
+      explanation: 'It checks whether granting a request leaves the system in a safe state, avoiding deadlock.',
+    },
+    {
+      id: 'os-q3',
+      topic: 'Synchronisation',
+      difficulty: 'medium',
+      question: 'A binary semaphore differs from a counting semaphore because it…',
+      options: [
+        'Only takes values 0 and 1',
+        'Cannot block a process',
+        'Is always owned by the kernel',
+        'Never causes deadlock',
+      ],
+      answer: 0,
+      explanation: 'A binary semaphore behaves like a mutex with only two states.',
+    },
+    {
+      id: 'os-q4',
+      topic: 'Memory Management',
+      difficulty: 'hard',
+      question: 'Belady’s anomaly can occur with which page replacement policy?',
+      options: ['LRU', 'Optimal', 'FIFO', 'LFU'],
+      answer: 2,
+      explanation: 'With FIFO, adding frames can increase page faults; stack algorithms like LRU cannot show this.',
+    },
+    {
+      id: 'os-q5',
+      topic: 'Processes & Threads',
+      difficulty: 'easy',
+      question: 'What do threads of the same process share?',
+      options: ['Registers', 'Stack', 'Address space', 'Program counter'],
+      answer: 2,
+      explanation: 'Threads share code, data and heap but keep their own stack and registers.',
+    },
+  ],
+  'computer-networks': [
+    {
+      id: 'cn-q1',
+      topic: 'OSI & TCP/IP Models',
+      difficulty: 'easy',
+      question: 'Which OSI layer handles end-to-end reliable delivery?',
+      options: ['Network', 'Transport', 'Session', 'Data link'],
+      answer: 1,
+      explanation: 'The transport layer (TCP) provides end-to-end reliability, ordering and flow control.',
+    },
+    {
+      id: 'cn-q2',
+      topic: 'TCP & UDP',
+      difficulty: 'medium',
+      question: 'How many messages does the TCP connection handshake use?',
+      options: ['Two', 'Three', 'Four', 'One'],
+      answer: 1,
+      explanation: 'SYN, SYN-ACK, ACK — a three-way handshake.',
+    },
+    {
+      id: 'cn-q3',
+      topic: 'Routing Algorithms',
+      difficulty: 'medium',
+      question: 'Dijkstra’s algorithm cannot be used when the graph has…',
+      options: ['Cycles', 'Negative edge weights', 'More than 100 nodes', 'Undirected edges'],
+      answer: 1,
+      explanation: 'Its greedy choice assumes distances never decrease later, which negative weights break.',
+    },
+    {
+      id: 'cn-q4',
+      topic: 'Congestion Control',
+      difficulty: 'hard',
+      question: 'During TCP slow start, the congestion window grows…',
+      options: ['Linearly', 'Exponentially', 'By one segment per RTT', 'Not at all'],
+      answer: 1,
+      explanation: 'The window doubles each RTT until it reaches the slow-start threshold.',
+    },
+  ],
+}
+
+export const quizDifficulties = ['easy', 'medium', 'hard']
+
+/**
+ * Pick questions for a quiz. Difficulty 'mixed' takes anything.
+ * A real backend would replace this with an AI-generated adaptive set.
+ */
+export function buildQuiz({ materialId, topic = 'All topics', difficulty = 'mixed', count = 5 }) {
+  const pool = mockQuestionBank[materialId] || []
+  let filtered = pool.filter((q) => (topic === 'All topics' ? true : q.topic === topic))
+  if (difficulty !== 'mixed') {
+    const byDifficulty = filtered.filter((q) => q.difficulty === difficulty)
+    if (byDifficulty.length) filtered = byDifficulty
+  }
+  if (!filtered.length) filtered = pool
+  return filtered.slice(0, count)
+}
+
+export const mockPreviousAttempts = [
+  {
+    id: 'attempt-seed-1',
+    materialId: 'data-structures',
+    materialTitle: 'Data Structures',
+    topic: 'Tree Traversal',
+    difficulty: 'medium',
+    total: 10,
+    score: 8,
+    accuracy: 80,
+    date: '2026-09-15',
+    strongTopics: ['Tree Traversal'],
+    weakTopics: ['BST Operations'],
+  },
+  {
+    id: 'attempt-seed-2',
+    materialId: 'dbms',
+    materialTitle: 'Database Management Systems',
+    topic: 'Normalisation',
+    difficulty: 'easy',
+    total: 6,
+    score: 4,
+    accuracy: 67,
+    date: '2026-09-13',
+    strongTopics: ['SQL Queries'],
+    weakTopics: ['Normalisation'],
+  },
+]

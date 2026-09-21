@@ -1,0 +1,22 @@
+# Environment files
+.env
+.env*.local
+*.env
+
+# SQLite local databases
+*.db
+*.sqlite3
+
+# Node dependencies and build
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# Python cache and environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
