@@ -6,6 +6,7 @@ from app.models.subject import Subject, Topic
 from app.models.material import Material
 from app.models.learner import LearnerModel, Progress
 from app.models.document import DocumentChunk, Summary
+from app.models.study import Note
 from app.services.auth_service import hash_password
 
 logger = logging.getLogger("uvicorn.error")
@@ -715,3 +716,78 @@ def seed_phase9_instructor_data(db: Session):
 
         db.commit()
         logger.info("Phase 9 Instructor seed data successfully created.")
+
+def seed_notes_data(db: Session):
+    """Seed initial high-yield study notes for students."""
+    student_user = db.query(User).filter(User.email == "student@study.edu").first()
+    if not student_user:
+        return
+
+    if db.query(Note).filter(Note.user_id == student_user.id).first():
+        return
+
+    note1 = Note(
+        user_id=student_user.id,
+        title="Binary Search Trees: Search, Insertion, and Balancing",
+        topic="Data Structures",
+        content="""## 1. Core Principles of Binary Search Trees (BST)
+A Binary Search Tree is an ordered node-based tree data structure where each node satisfies the BST invariant:
+- The left subtree of a node contains only keys less than the node's key.
+- The right subtree of a node contains only keys greater than the node's key.
+- Both left and right subtrees must also be binary search trees.
+
+## 2. Inorder Traversal Property
+An inorder traversal (Left -> Node -> Right) of any valid Binary Search Tree processes and visits elements in strictly sorted ascending order. This makes BSTs optimal for range queries and dynamic sorted sets.
+
+## 3. Algorithmic Complexity
+- Average Time Complexity: O(log N) for Search, Insert, and Delete in balanced trees.
+- Worst Time Complexity: O(N) when inserted in strictly sorted order, causing degeneration into a singly-linked list.
+- Balanced Alternatives: AVL Trees and Red-Black Trees guarantee O(log N) height via self-balancing rotations.""",
+        key_points_json=[
+            "BST Invariant: Left child < Node < Right child for all subtrees.",
+            "Inorder traversal always yields sorted keys in ascending sequence.",
+            "Degenerate BST behaves as a linked list with O(N) search time.",
+            "Self-balancing variants (AVL, Red-Black) maintain O(log N) height through tree rotations."
+        ],
+        examples_json=[
+            "def search_bst(root, key):\n    if root is None or root.val == key:\n        return root\n    if key < root.val:\n        return search_bst(root.left, key)\n    return search_bst(root.right, key)"
+        ],
+        tags_json=["trees", "algorithms", "data-structures", "search"],
+        is_favorite=True,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+
+    note2 = Note(
+        user_id=student_user.id,
+        title="Operating Systems: Coffman Conditions & Deadlock Avoidance",
+        topic="Operating Systems",
+        content="""## 1. The Four Coffman Conditions
+Deadlock can occur if and only if all four of the following conditions hold simultaneously in a system:
+1. Mutual Exclusion: At least one resource must be held in a non-shareable mode.
+2. Hold and Wait: A process must be holding at least one resource and requesting additional resources held by other processes.
+3. No Preemption: Resources cannot be forcibly seized from a process; they can only be released voluntarily.
+4. Circular Wait: A closed chain of processes exists such that each process holds resources needed by the next process in the chain.
+
+## 2. Deadlock Handling Strategies
+- Prevention: Invalidate at least one of the four Coffman conditions (e.g., enforce strict resource ordering to break circular wait).
+- Avoidance: Banker's Algorithm dynamically inspects state to ensure the system never enters an unsafe state.
+- Detection & Recovery: Allow deadlocks to occur, periodically run cycle-detection on Resource Allocation Graphs (RAG), and preempt or terminate processes to break cycles.""",
+        key_points_json=[
+            "All four Coffman conditions must hold concurrently for a deadlock to exist.",
+            "Breaking any single Coffman condition renders deadlock impossible.",
+            "Banker's Algorithm ensures safe states using resource allocation and claim matrices.",
+            "Resource Allocation Graph (RAG) cycles indicate deadlock when resources have single units."
+        ],
+        examples_json=[
+            "// Breaking Circular Wait via Global Resource Ordering:\nvoid acquire_locks(int r1, int r2) {\n    if (r1 < r2) {\n        lock(r1); lock(r2);\n    } else {\n        lock(r2); lock(r1);\n    }\n}"
+        ],
+        tags_json=["operating-systems", "concurrency", "deadlocks", "process-synchronization"],
+        is_favorite=False,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+
+    db.add_all([note1, note2])
+    db.commit()
+    logger.info("Successfully seeded initial study notes.")

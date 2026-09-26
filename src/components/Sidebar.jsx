@@ -21,6 +21,7 @@ import {
   Sparkles,
   ShieldCheck,
   BookOpenCheck,
+  BookOpen,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useStudyData } from '../context/StudyDataContext.jsx'
@@ -38,6 +39,7 @@ export const studentNavSections = [
     title: 'AI Learning Tools',
     items: [
       { to: '/tutor', label: 'AI Tutor', icon: Bot, isNew: true },
+      { to: '/notes', label: 'Study Notes & PDF', icon: BookOpen },
       { to: '/summaries', label: 'Summaries', icon: FileText },
       { to: '/flashcards', label: 'Flashcards', icon: Layers },
       { to: '/quizzes', label: 'Quizzes', icon: ClipboardCheck },

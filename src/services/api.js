@@ -1005,3 +1005,80 @@ export async function clearAllNotifications() {
   }
 }
 
+/* ---------------------------------- notes ---------------------------------- */
+
+export async function getNotes(params = {}) {
+  try {
+    const query = new URLSearchParams()
+    if (params.topic) query.append('topic', params.topic)
+    if (params.search) query.append('search', params.search)
+    if (params.favoritesOnly) query.append('favorites_only', 'true')
+
+    const qs = query.toString() ? `?${query.toString()}` : ''
+    const { data } = await http.get(`/notes${qs}`)
+    return data
+  } catch (err) {
+    console.warn('Backend GET /notes failed:', err.message)
+    // Fallback to local storage
+    const local = readStorage('notes_cache', [])
+    return local
+  }
+}
+
+export async function getNote(id) {
+  const { data } = await http.get(`/notes/${id}`)
+  return data
+}
+
+export async function createNote(payload) {
+  try {
+    const { data } = await http.post('/notes', payload)
+    return data
+  } catch (err) {
+    console.warn('Backend POST /notes failed, saving locally:', err.message)
+    const local = readStorage('notes_cache', [])
+    const newNote = {
+      id: Date.now(),
+      ...payload,
+      key_points: payload.key_points || [],
+      examples: payload.examples || [],
+      tags: payload.tags || [],
+      is_favorite: payload.is_favorite || false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    writeStorage('notes_cache', [newNote, ...local])
+    return newNote
+  }
+}
+
+export async function updateNote(id, payload) {
+  try {
+    const { data } = await http.put(`/notes/${id}`, payload)
+    return data
+  } catch (err) {
+    console.warn(`Backend PUT /notes/${id} failed, updating locally:`, err.message)
+    const local = readStorage('notes_cache', [])
+    const updated = local.map((n) => (n.id === id ? { ...n, ...payload, updated_at: new Date().toISOString() } : n))
+    writeStorage('notes_cache', updated)
+    return updated.find((n) => n.id === id)
+  }
+}
+
+export async function deleteNote(id) {
+  try {
+    const { data } = await http.delete(`/notes/${id}`)
+    return data
+  } catch (err) {
+    console.warn(`Backend DELETE /notes/${id} failed:`, err.message)
+    const local = readStorage('notes_cache', [])
+    writeStorage('notes_cache', local.filter((n) => n.id !== id))
+    return { message: 'Deleted locally' }
+  }
+}
+
+export async function generateStructuredNote({ content_or_prompt, topic }) {
+  const { data } = await http.post('/notes/generate', { content_or_prompt, topic })
+  return data
+}
+

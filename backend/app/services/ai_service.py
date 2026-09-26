@@ -528,35 +528,75 @@ class AIService:
 
         return fallback_guidance
 
-    def _extract_json_object(self, text: str) -> Dict[str, Any]:
-        """Extract and parse a single JSON object from raw model text."""
+    def _clean_json_text(self, text: str) -> str:
+        """Helper to strip outer markdown code blocks and extract JSON content safely."""
         if not text:
-            return {}
+            return ""
         cleaned = text.strip()
-        if "```" in cleaned:
-            match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
-            if match:
-                cleaned = match.group(1).strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
+            cleaned = "\n".join(lines).strip()
 
         start = cleaned.find("{")
         end = cleaned.rfind("}")
         if start != -1 and end != -1 and end > start:
             cleaned = cleaned[start:end+1]
+        return cleaned
 
+    def _extract_json_object(self, text: str) -> Dict[str, Any]:
+        """Extract and parse a single JSON object from raw model text."""
+        if not text:
+            return {}
+        cleaned = self._clean_json_text(text)
+
+        # 1. Standard strict=False load
         try:
-            data = json.loads(cleaned)
+            data = json.loads(cleaned, strict=False)
             if isinstance(data, dict):
                 return data
-        except Exception as e:
-            logger.warning(f"JSON object parse failed: {e}. Attempting recovery.")
-            for obj_str in re.findall(r"\{[^{}]*\}", cleaned):
-                try:
-                    parsed = json.loads(obj_str)
-                    if isinstance(parsed, dict):
-                        return parsed
-                except Exception:
-                    continue
+        except Exception:
+            pass
+
+        # 2. Iteratively fix unescaped backslashes and bad unicode escapes (common in LaTeX, math formulas, URLs)
+        repaired = cleaned
+        for _ in range(150):
+            try:
+                data = json.loads(repaired, strict=False)
+                if isinstance(data, dict):
+                    return data
+            except json.JSONDecodeError as e:
+                err_msg = str(e)
+                if "Invalid \\escape" in err_msg or "Invalid \\uXXXX escape" in err_msg:
+                    pos = e.pos
+                    if pos > 0 and repaired[pos] != '\\' and repaired[pos-1] == '\\':
+                        pos = pos - 1
+                    elif pos < len(repaired) and repaired[pos] != '\\':
+                        bs_pos = repaired.rfind('\\', max(0, pos - 12), pos + 1)
+                        if bs_pos != -1:
+                            pos = bs_pos
+                    if 0 <= pos < len(repaired) and repaired[pos] == '\\':
+                        repaired = repaired[:pos] + "\\\\" + repaired[pos+1:]
+                    else:
+                        break
+                else:
+                    break
+            except Exception:
+                break
+
+        # 3. Fallback recovery for individual object fragments
+        for obj_str in re.findall(r"\{[^{}]*\}", cleaned):
+            try:
+                parsed = json.loads(obj_str, strict=False)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                continue
         return {}
+
 
     def generate_viva_question(
         self,
@@ -994,6 +1034,114 @@ class AIService:
                     }
         except Exception as e:
             logger.warning(f"Error in generate_assessment_questions: {e}")
+
+        return fallback_res
+
+    def generate_structured_notes(self, content_or_prompt: str, topic: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Transforms raw student learning text, AI tutor answers, or topic requests
+        into structured, formatted study notes with headings, key takeaways, and examples.
+        """
+        derived_topic = (topic or "").strip() or "General Academic"
+        clean_input = content_or_prompt.strip()
+        first_line = clean_input.split("\n")[0].replace("#", "").strip()[:80]
+        fallback_title = first_line if first_line else f"{derived_topic} Study Notes"
+
+        # Provide a structured educational fallback if offline or API unavailable
+        fallback_content = (
+            f"## 1. Overview & Core Definition\n"
+            f"{clean_input}\n\n"
+            f"Comprehensive study notes exploring foundational principles, algorithmic design, and real-world considerations for **{derived_topic}**.\n\n"
+            f"## 2. Fundamental Taxonomies & Classifications\n"
+            f"- **Foundational Concepts:** Core definitions, mathematical prerequisites, and boundary constraints.\n"
+            f"- **Architectural Paradigms:** Comparative breakdown of primary approaches and design patterns.\n"
+            f"- **System Trade-offs:** Efficiency, scalability, and complexity characteristics.\n\n"
+            f"## 3. Working Mechanisms & Algorithmic Foundations\n"
+            f"1. **Initialization & Setup:** Formulating the input problem representation.\n"
+            f"2. **Core Execution Cycle:** Step-by-step state transformation and iterative refinement.\n"
+            f"3. **Convergence & Termination:** Verification of invariant conditions and optimal criteria.\n\n"
+            f"## 4. Practical Implementation & Best Practices\n"
+            f"- Deconstruct complex problems into verified modular components.\n"
+            f"- Maintain rigorous test fixtures and benchmark against standard baselines.\n"
+            f"- Conduct active recall revision and test knowledge with practice assessments.\n"
+        )
+
+        fallback_res = {
+            "title": fallback_title,
+            "topic": derived_topic,
+            "content": fallback_content,
+            "key_points": [
+                f"Core foundational principles of {derived_topic}.",
+                "Understand fundamental definitions, edge cases, and algorithmic complexity.",
+                "Compare trade-offs between standard approaches and modern variants.",
+                "Review active recall flashcards and test understanding with topic quizzes."
+            ],
+            "examples": [
+                f"Practical walkthrough applying {derived_topic} principles to optimize system performance.",
+                f"Step-by-step problem breakdown illustrating standard edge cases."
+            ],
+            "tags": [derived_topic.lower().replace(" ", "-"), "study-notes", "revision"]
+        }
+
+        # Extract existing bullet points if present in content
+        extracted_bullets = []
+        for line in clean_input.split("\n"):
+            line_str = line.strip()
+            if (line_str.startswith("- ") or line_str.startswith("* ") or (len(line_str) > 2 and line_str[0].isdigit() and line_str[1] in [".", ")"])) and len(line_str) > 10:
+                clean_pt = line_str.lstrip("-*0123456789.) ").strip()
+                if clean_pt and len(clean_pt) < 180:
+                    extracted_bullets.append(clean_pt)
+        if extracted_bullets:
+            fallback_res["key_points"] = extracted_bullets[:5]
+
+        if not self.is_configured():
+            return fallback_res
+
+        prompt = (
+            f"You are an expert university professor and technical educator. "
+            f"Generate comprehensive, in-depth academic study notes for the following topic request or lecture excerpt:\n\n"
+            f"Topic Context: {derived_topic}\n"
+            f"User Prompt / Source Concept:\n{clean_input[:3000]}\n\n"
+            f"Instructions:\n"
+            f"1. Create an accurate, professional academic Title.\n"
+            f"2. Generate extensive, detailed Markdown notes in the 'content' field. Do NOT provide short placeholders or brief bullet lists. Write full, educational explanations covering:\n"
+            f"   - ## 1. Overview & Core Definition\n"
+            f"   - ## 2. Core Paradigms & Classifications (explain each type in detail)\n"
+            f"   - ## 3. Key Algorithms & Mathematical Mechanisms (detailed workings)\n"
+            f"   - ## 4. Practical Real-World Applications & Code / Pseudocode\n"
+            f"   - ## 5. Comparative Trade-offs & Best Practices\n"
+            f"3. Provide 4 to 6 high-yield key takeaways in 'key_points'.\n"
+            f"4. Provide 2 to 3 practical, concrete examples or code walkthroughs in 'examples'.\n"
+            f"5. Provide 3 to 5 relevant lowercase tags in 'tags'.\n\n"
+            f"Return ONLY valid JSON matching this schema:\n"
+            f"{{\n"
+            f'  "title": "Clear, Professional Academic Title",\n'
+            f'  "topic": "{derived_topic}",\n'
+            f'  "content": "Full detailed markdown notes...",\n'
+            f'  "key_points": ["point 1", "point 2", "point 3", "point 4"],\n'
+            f'  "examples": ["example 1", "example 2"],\n'
+            f'  "tags": ["tag1", "tag2", "tag3"]\n'
+            f"}}"
+        )
+
+        try:
+            res = self.generate_text(
+                prompt=prompt,
+                system_instruction="You are an expert professor authoring structured, high-yield academic study notes. Always respond with a single, strict, parseable JSON object."
+            )
+            if res.get("success"):
+                data = self._extract_json_object(res.get("reply", ""))
+                if isinstance(data, dict) and data.get("title") and data.get("content"):
+                    return {
+                        "title": str(data.get("title", "")).strip() or fallback_res["title"],
+                        "topic": str(data.get("topic", "")).strip() or derived_topic,
+                        "content": str(data.get("content", "")).strip() or fallback_res["content"],
+                        "key_points": data.get("key_points") if isinstance(data.get("key_points"), list) and data.get("key_points") else fallback_res["key_points"],
+                        "examples": data.get("examples") if isinstance(data.get("examples"), list) and data.get("examples") else fallback_res["examples"],
+                        "tags": data.get("tags") if isinstance(data.get("tags"), list) and data.get("tags") else fallback_res["tags"],
+                    }
+        except Exception as e:
+            logger.warning(f"Error in generate_structured_notes: {e}")
 
         return fallback_res
 

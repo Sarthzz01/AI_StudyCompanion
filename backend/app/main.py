@@ -6,7 +6,7 @@ from app.config import settings
 from app.database import engine, Base, SessionLocal, run_migrations
 import app.models  # Ensures all 16 models are registered
 from app.seed import seed_database
-from app.routers import auth, profile, subjects, materials, ai, tutor, summaries, flashcards, quizzes, progress, recommendations, study_plan, revision, viva, instructor, notifications
+from app.routers import auth, profile, subjects, materials, ai, tutor, summaries, flashcards, quizzes, progress, recommendations, study_plan, revision, viva, instructor, notifications, notes
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("uvicorn.error")
@@ -22,9 +22,10 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed_database(db)
-        from app.seed import seed_phase3_chunks, seed_phase9_instructor_data
+        from app.seed import seed_phase3_chunks, seed_phase9_instructor_data, seed_notes_data
         seed_phase3_chunks(db)
         seed_phase9_instructor_data(db)
+        seed_notes_data(db)
     finally:
         db.close()
         
@@ -67,6 +68,7 @@ app.include_router(viva.router)
 app.include_router(instructor.router, prefix=settings.API_V1_STR)
 app.include_router(instructor.student_assessments_router, prefix=settings.API_V1_STR)
 app.include_router(notifications.router, prefix=settings.API_V1_STR)
+app.include_router(notes.router, prefix=settings.API_V1_STR)
 app.include_router(ai.router, prefix=settings.API_V1_STR)
 
 @app.get("/")

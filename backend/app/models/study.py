@@ -171,3 +171,22 @@ class Analytics(Base):
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="analytics")
+
+class Note(Base):
+    __tablename__ = "notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    material_id = Column(String(100), ForeignKey("materials.id", ondelete="SET NULL"), nullable=True, index=True)
+    title = Column(String(255), nullable=False)
+    topic = Column(String(200), nullable=True)
+    content = Column(Text, nullable=False)
+    key_points_json = Column(JSON, default=list, nullable=False)
+    examples_json = Column(JSON, default=list, nullable=False)
+    tags_json = Column(JSON, default=list, nullable=False)
+    is_favorite = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user = relationship("User", back_populates="notes")
+    material = relationship("Material")

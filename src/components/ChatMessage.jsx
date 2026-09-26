@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { Bot, User, FileText, Check, Copy } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Bot, User, FileText, Check, Copy, BookOpen } from 'lucide-react'
+import { createNote } from '../services/api.js'
+import { useToast } from '../context/ToastContext.jsx'
 
 function CodeBlock({ language, code }) {
   const [copied, setCopied] = useState(false)
@@ -116,6 +119,10 @@ function FormattedContent({ text, isUser }) {
 export default function ChatMessage({ message }) {
   const isUser = message.role === 'user'
   const [copiedMsg, setCopiedMsg] = useState(false)
+  const [savingNote, setSavingNote] = useState(false)
+  const [savedNote, setSavedNote] = useState(false)
+  const toast = useToast()
+  const navigate = useNavigate()
 
   const handleCopyMessage = async () => {
     try {
@@ -124,6 +131,41 @@ export default function ChatMessage({ message }) {
       setTimeout(() => setCopiedMsg(false), 2000)
     } catch (err) {
       console.warn('Could not copy message:', err)
+    }
+  }
+
+  const handleSaveAsNote = async () => {
+    if (savingNote || savedNote) return
+    setSavingNote(true)
+    try {
+      // Derive note title from first line of assistant reply
+      const firstLine = message.content.split('\n')[0].replace(/^[#*-\s]+/, '').slice(0, 50)
+      const noteTitle = firstLine ? `AI Tutor: ${firstLine}` : 'AI Tutor Explanation Notes'
+
+      // Extract quick bullet points
+      const keyPoints = message.content
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => (l.startsWith('- ') || l.startsWith('* ') || /^\d+\.\s/.test(l)) && l.length > 8)
+        .slice(0, 4)
+        .map((l) => l.replace(/^[-*0123456789.)\s]+/, ''))
+
+      await createNote({
+        title: noteTitle,
+        topic: 'AI Tutor Notes',
+        content: message.content,
+        key_points: keyPoints,
+        examples: [],
+        tags: ['ai-tutor', 'saved-chat'],
+      })
+
+      setSavedNote(true)
+      toast('Saved to Study Notes! Open Notes to download PDF.', 'success')
+      setTimeout(() => setSavedNote(false), 4000)
+    } catch (err) {
+      toast('Failed to save note. Please try again.', 'error')
+    } finally {
+      setSavingNote(false)
     }
   }
 
@@ -151,9 +193,9 @@ export default function ChatMessage({ message }) {
         >
           <FormattedContent text={message.content} isUser={isUser} />
 
-          {/* Copy Message Action Button on Assistant message */}
+          {/* Action Buttons on Assistant message */}
           {!isUser && (
-            <div className="mt-2.5 flex items-center justify-between border-t border-ink-100/80 pt-2 opacity-0 transition-opacity group-hover:opacity-100 dark:border-ink-800/80">
+            <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-ink-100/80 pt-2 opacity-0 transition-opacity group-hover:opacity-100 dark:border-ink-800/80">
               <button
                 onClick={handleCopyMessage}
                 className="flex items-center gap-1 text-[11px] font-medium text-ink-400 transition hover:text-brand-600 dark:hover:text-brand-400"
@@ -168,6 +210,25 @@ export default function ChatMessage({ message }) {
                   <>
                     <Copy size={12} />
                     <span>Copy message</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleSaveAsNote}
+                disabled={savingNote}
+                className="flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition"
+                title="Save as structured study note"
+              >
+                {savedNote ? (
+                  <>
+                    <Check size={12} className="text-emerald-500" />
+                    <span className="text-emerald-500">Saved to Notes</span>
+                  </>
+                ) : (
+                  <>
+                    <BookOpen size={12} />
+                    <span>Save as Note</span>
                   </>
                 )}
               </button>

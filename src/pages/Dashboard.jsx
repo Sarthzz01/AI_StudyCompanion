@@ -16,6 +16,7 @@ import {
   Check,
   Flame,
   Sparkles,
+  BookOpen,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -75,6 +76,14 @@ const interactiveTools = [
     icon: CalendarClock,
     to: '/study-plan',
     iconBg: 'bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-300',
+  },
+  {
+    label: 'Study Notes & PDF',
+    desc: 'Structured revision notes with instant PDF export',
+    icon: BookOpen,
+    to: '/notes',
+    badge: 'Export',
+    iconBg: 'bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-300',
   },
   {
     label: 'Document Summaries',

@@ -20,6 +20,7 @@ import Goals from './pages/Goals.jsx'
 import Notifications from './pages/Notifications.jsx'
 import Profile from './pages/Profile.jsx'
 import Viva from './pages/Viva.jsx'
+import Notes from './pages/Notes.jsx'
 import NotFound from './pages/NotFound.jsx'
 
 // Instructor Module Pages
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="/quizzes/:id" element={<QuizAttempt />} />
         <Route path="/quiz-result" element={<QuizResult />} />
         <Route path="/viva" element={<Viva />} />
+        <Route path="/notes" element={<Notes />} />
         <Route path="/progress" element={<Progress />} />
         <Route path="/goals" element={<Goals />} />
         <Route path="/notifications" element={<Notifications />} />

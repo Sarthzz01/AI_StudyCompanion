@@ -41,6 +41,7 @@ class User(Base):
     goals = relationship("Goal", back_populates="user", cascade="all, delete-orphan")
     study_plan_tasks = relationship("StudyPlanTask", back_populates="user", cascade="all, delete-orphan")
     viva_sessions = relationship("VivaSession", back_populates="user", cascade="all, delete-orphan")
+    notes = relationship("Note", back_populates="user", cascade="all, delete-orphan")
     created_assessments = relationship("Assessment", foreign_keys="[Assessment.instructor_id]", back_populates="instructor", cascade="all, delete-orphan")
     assigned_assessments = relationship("AssessmentAssignment", foreign_keys="[AssessmentAssignment.instructor_id]", back_populates="instructor", cascade="all, delete-orphan")
     assessment_submissions = relationship("AssessmentSubmission", foreign_keys="[AssessmentSubmission.student_id]", back_populates="student", cascade="all, delete-orphan")
