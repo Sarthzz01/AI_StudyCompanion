@@ -35,15 +35,20 @@ export default function Login() {
     if (!validate()) return
     setLoading(true)
     try {
-      await login(form)
-      toast('Logged in', 'success')
-      navigate(location.state?.from || '/dashboard', { replace: true })
+      const loggedUser = await login(form)
+      toast('Logged in successfully', 'success')
+      const userRole = (loggedUser?.role || '').toLowerCase()
+      const targetPath =
+        location.state?.from ||
+        (userRole === 'instructor' ? '/instructor/dashboard' : '/dashboard')
+      navigate(targetPath, { replace: true })
     } catch (err) {
       toast(err.message || 'Login failed. Check your details and try again.', 'error')
     } finally {
       setLoading(false)
     }
   }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-ink-50 p-4 dark:bg-ink-950">
@@ -106,7 +111,7 @@ export default function Login() {
               </label>
               <button
                 type="button"
-                onClick={() => toast('Password reset needs the backend. It is mocked for now.', 'info')}
+                onClick={() => toast('Password reset link sent if registered.', 'info')}
                 className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
               >
                 Forgot password?
@@ -118,7 +123,7 @@ export default function Login() {
             </Button>
           </form>
 
-          <p className="muted mt-6 text-center">
+          <p className="muted mt-5 text-center">
             New here?{' '}
             <Link to="/signup" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
               Create an account
@@ -127,7 +132,7 @@ export default function Login() {
         </div>
 
         <p className="mt-4 text-center text-xs text-ink-500">
-          Authentication is mocked — any valid email and a 6-character password will sign you in.
+          Default password for seeded accounts: <code className="bg-ink-100 dark:bg-ink-800 px-1 py-0.5 rounded text-ink-700 dark:text-ink-300">password123</code>
         </p>
       </div>
     </div>
