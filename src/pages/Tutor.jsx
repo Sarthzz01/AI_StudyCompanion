@@ -10,9 +10,10 @@ import {
   MessageSquare,
   Loader2,
   Search,
-  Sparkles,
   BookOpen,
   X,
+  Edit3,
+  Check,
 } from 'lucide-react'
 import PageHeader from '../components/PageHeader.jsx'
 import Card from '../components/Card.jsx'
@@ -24,6 +25,7 @@ import {
   getTutorConversations,
   getTutorConversation,
   deleteTutorConversation,
+  renameTutorConversation,
 } from '../services/api.js'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -51,6 +53,10 @@ export default function Tutor() {
   const [loadingConversations, setLoadingConversations] = useState(false)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Renaming state
+  const [renamingConvId, setRenamingConvId] = useState(null)
+  const [renameInput, setRenameInput] = useState('')
 
   // Current active chat messages
   const [messages, setMessages] = useState([INITIAL_WELCOME])
@@ -110,6 +116,7 @@ export default function Tutor() {
     setMessages([INITIAL_WELCOME])
     setError(null)
     setInput('')
+    setRenamingConvId(null)
     setTimeout(() => inputRef.current?.focus(), 50)
   }
 
@@ -118,6 +125,7 @@ export default function Tutor() {
     if (convId === currentConversationId) return
     setLoadingMessages(true)
     setError(null)
+    setRenamingConvId(null)
 
     try {
       const msgs = await getTutorConversation(convId)
@@ -174,6 +182,44 @@ export default function Tutor() {
     } catch (err) {
       toast('Failed to delete conversation', 'error')
     }
+  }
+
+  // Rename a conversation thread
+  const startRename = (e, c) => {
+    e.stopPropagation()
+    setRenamingConvId(c.conversation_id)
+    setRenameInput(c.title || '')
+  }
+
+  const saveRename = async (e, convId) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    const trimmed = renameInput.trim()
+    if (!trimmed) {
+      setRenamingConvId(null)
+      return
+    }
+    try {
+      await renameTutorConversation(convId, trimmed)
+      setConversations((prev) =>
+        prev.map((c) => (c.conversation_id === convId ? { ...c, title: trimmed } : c))
+      )
+      if (currentConversationId === convId) {
+        setConversationTitle(trimmed)
+      }
+      toast('Chat renamed', 'success')
+    } catch (err) {
+      toast('Failed to rename chat', 'error')
+    } finally {
+      setRenamingConvId(null)
+    }
+  }
+
+  const cancelRename = (e) => {
+    if (e) e.stopPropagation()
+    setRenamingConvId(null)
   }
 
   // Send a question to the AI Tutor
@@ -343,6 +389,8 @@ export default function Tutor() {
             ) : (
               filteredConversations.map((c) => {
                 const isActive = currentConversationId === c.conversation_id
+                const isRenaming = renamingConvId === c.conversation_id
+
                 return (
                   <div
                     key={c.conversation_id}
@@ -353,33 +401,78 @@ export default function Tutor() {
                         : 'border-l-[3px] border-transparent text-ink-700 hover:bg-ink-100/70 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-ink-800/50 dark:hover:text-ink-100'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0 pr-6">
-                      <MessageSquare
-                        size={14}
-                        className={`shrink-0 transition-colors ${
-                          isActive
-                            ? 'text-brand-600 dark:text-brand-400'
-                            : 'text-ink-400 group-hover:text-brand-500'
-                        }`}
-                      />
-                      <div className="truncate text-left">
-                        <p className="truncate leading-tight font-medium">
-                          {c.title || 'Conversation'}
-                        </p>
-                        <span className="text-[10px] text-ink-400 dark:text-ink-500 font-normal">
-                          {c.updated_at || 'Recent'}
-                        </span>
-                      </div>
-                    </div>
+                    {isRenaming ? (
+                      <form
+                        onSubmit={(e) => saveRename(e, c.conversation_id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 w-full"
+                      >
+                        <input
+                          type="text"
+                          autoFocus
+                          value={renameInput}
+                          onChange={(e) => setRenameInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') cancelRename(e)
+                          }}
+                          className="w-full rounded-md border border-brand-500 bg-white px-2 py-0.5 text-xs text-ink-900 focus:outline-none dark:bg-ink-950 dark:text-white"
+                        />
+                        <button
+                          type="submit"
+                          title="Save title"
+                          className="rounded p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                        >
+                          <Check size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelRename}
+                          title="Cancel"
+                          className="rounded p-1 text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-800"
+                        >
+                          <X size={13} />
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2.5 min-w-0 pr-14">
+                          <MessageSquare
+                            size={14}
+                            className={`shrink-0 transition-colors ${
+                              isActive
+                                ? 'text-brand-600 dark:text-brand-400'
+                                : 'text-ink-400 group-hover:text-brand-500'
+                            }`}
+                          />
+                          <div className="truncate text-left">
+                            <p className="truncate leading-tight font-medium">
+                              {c.title || 'Conversation'}
+                            </p>
+                            <span className="text-[10px] text-ink-400 dark:text-ink-500 font-normal">
+                              {c.updated_at || 'Recent'}
+                            </span>
+                          </div>
+                        </div>
 
-                    {/* Delete Thread Button */}
-                    <button
-                      onClick={(e) => handleDeleteConversation(e, c.conversation_id)}
-                      title="Delete chat"
-                      className="absolute right-2 rounded-md p-1.5 text-ink-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/50 dark:hover:text-red-400"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                        {/* Action buttons on hover */}
+                        <div className="absolute right-1.5 flex items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100">
+                          <button
+                            onClick={(e) => startRename(e, c)}
+                            title="Rename chat"
+                            className="rounded-md p-1 text-ink-400 hover:bg-ink-200/70 hover:text-ink-800 dark:hover:bg-ink-800 dark:hover:text-ink-100"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteConversation(e, c.conversation_id)}
+                            title="Delete chat"
+                            className="rounded-md p-1 text-ink-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )
               })
@@ -422,6 +515,18 @@ export default function Tutor() {
                   <h2 className="truncate text-sm font-semibold text-ink-900 dark:text-white">
                     {conversationTitle}
                   </h2>
+                  {currentConversationId && (
+                    <button
+                      onClick={() => {
+                        const match = conversations.find((c) => c.conversation_id === currentConversationId)
+                        if (match) startRename({ stopPropagation: () => {} }, match)
+                      }}
+                      title="Rename this conversation"
+                      className="rounded p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-800 dark:hover:bg-ink-800 dark:hover:text-ink-100 transition-colors"
+                    >
+                      <Edit3 size={13} />
+                    </button>
+                  )}
                   <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-950/80 dark:text-brand-300 border border-brand-200/50 dark:border-brand-800/50">
                     GPT-4o Tutor
                   </span>

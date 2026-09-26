@@ -50,3 +50,6 @@ class TutorHistoryItemOut(BaseModel):
     conversation_id: Optional[str] = None
     created_at: str
     sources: List[SourceReferenceOut] = []
+
+class TutorConversationRenameRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=100, description="The custom renamed title")

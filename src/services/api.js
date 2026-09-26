@@ -244,6 +244,16 @@ export async function deleteTutorConversation(conversationId) {
   }
 }
 
+export async function renameTutorConversation(conversationId, title) {
+  try {
+    const { data } = await http.patch(`/tutor/conversations/${conversationId}/rename`, { title })
+    return data
+  } catch (err) {
+    console.warn(`Could not rename conversation ${conversationId}:`, err.message)
+    throw err
+  }
+}
+
 export async function getTutorHistory(materialId) {
   try {
     const params = {}

@@ -14,7 +14,8 @@ from app.schemas.tutor import (
     TutorAskResponse,
     SourceReferenceOut,
     TutorHistoryItemOut,
-    TutorConversationSummary
+    TutorConversationSummary,
+    TutorConversationRenameRequest
 )
 from app.services.deps import get_current_user
 from app.services.openai_service import openai_service
@@ -58,14 +59,7 @@ def ask_tutor(
         .order_by(TutorInteraction.created_at.asc())
         .first()
     )
-    
-    if existing_conv_first and existing_conv_first.title:
-        conv_title = existing_conv_first.title
-    else:
-        # Create a clean title from the user query
-        conv_title = query[:45].strip()
-        if len(query) > 45:
-            conv_title += "…"
+    conv_title = existing_conv_first.title if (existing_conv_first and existing_conv_first.title) else None
 
     context_blocks: List[str] = []
     sources: List[SourceReferenceOut] = []
@@ -139,6 +133,17 @@ def ask_tutor(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="The AI Tutor is temporarily unable to generate a response. Please try again."
         )
+
+    # If title not established yet, generate by understanding the whole conversation
+    if not conv_title:
+        try:
+            conv_title = openai_service.generate_conversation_title(
+                first_message=query,
+                first_answer=answer
+            )
+        except Exception as title_err:
+            logger.warning(f"Could not generate AI title: {title_err}")
+            conv_title = query[:45].strip()
 
     # 4. Save interaction to database for conversation history persistence
     try:
@@ -290,6 +295,37 @@ def delete_tutor_conversation(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete conversation."
         )
+
+@router.patch("/conversations/{conversation_id}/rename")
+def rename_tutor_conversation(
+    conversation_id: str,
+    payload: TutorConversationRenameRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Renames an existing conversation thread with a user-specified custom title.
+    """
+    new_title = payload.title.strip()
+    if not new_title:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Title cannot be empty.")
+
+    records = (
+        db.query(TutorInteraction)
+        .filter(
+            TutorInteraction.user_id == current_user.id,
+            TutorInteraction.conversation_id == conversation_id
+        )
+        .all()
+    )
+    if not records:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+
+    for r in records:
+        r.title = new_title[:100]
+    db.commit()
+
+    return {"conversation_id": conversation_id, "title": new_title}
 
 @router.get("/history", response_model=List[TutorHistoryItemOut])
 def get_tutor_history(

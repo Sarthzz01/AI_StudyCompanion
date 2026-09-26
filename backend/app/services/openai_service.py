@@ -232,4 +232,56 @@ class OpenAIService:
                 "Feel free to ask a specific follow-up question or request an example!"
             )
 
+    def generate_conversation_title(
+        self,
+        first_message: str,
+        first_answer: Optional[str] = None
+    ) -> str:
+        """
+        Generates a concise, smart title (3 to 6 words) summarizing what the whole conversation is about.
+        Uses OpenAI if available, with intelligent semantic fallback.
+        """
+        if self.is_configured():
+            try:
+                client = self.client
+                if client:
+                    summary_context = f"Student query: {first_message.strip()}"
+                    if first_answer:
+                        summary_context += f"\nTutor response snippet: {first_answer[:250].strip()}"
+
+                    prompt = (
+                        "Generate a short, concise, high-level title (3 to 5 words maximum, no quotes, no trailing punctuation) "
+                        "that accurately captures what this study discussion is about based on the student's question and explanation:\n\n"
+                        f"{summary_context}\n\n"
+                        "Title:"
+                    )
+
+                    completion = client.chat.completions.create(
+                        model=self.model_name,
+                        messages=[
+                            {"role": "system", "content": "You are a concise academic assistant that creates short 3-5 word titles for study discussions."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_tokens=20,
+                        temperature=0.3,
+                    )
+                    title = completion.choices[0].message.content or ""
+                    cleaned = title.strip().strip('"\'').strip()
+                    if cleaned:
+                        return cleaned[:50]
+            except Exception as e:
+                logger.warning(f"Could not generate AI title with OpenAI: {e}")
+
+        # Intelligent fallback: extract topic from query
+        clean = first_message.strip()
+        for prefix in ["what is ", "what are ", "explain ", "can you explain ", "tell me about ", "how does ", "how do i ", "how to ", "write a "]:
+            if clean.lower().startswith(prefix):
+                clean = clean[len(prefix):].strip()
+                break
+        clean = clean.split("?")[0].split(".")[0].strip()
+        words = clean.split()
+        if len(words) > 5:
+            return " ".join(words[:5]).title()
+        return clean.title() if clean else "Study Discussion"
+
 openai_service = OpenAIService()
