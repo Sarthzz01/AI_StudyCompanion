@@ -5,6 +5,8 @@ from app.models.material import Material
 from app.models.document import DocumentChunk, Summary, TutorInteraction, SourceReference
 from app.models.learner import LearnerModel, Progress, RevisionSchedule, Recommendation
 from app.models.study import Quiz, Question, Flashcard, QuizAttempt, QuizAnswer, Performance, StudySession, Notification, Analytics, Goal
+from app.models.viva import VivaSession, VivaQuestion, VivaAnswer, VivaEvaluation
+from app.models.assessment import Assessment, AssessmentAssignment, AssessmentSubmission, InstructorFeedback
 
 __all__ = [
     "Base",
@@ -32,4 +34,12 @@ __all__ = [
     "Goal",
     "Notification",
     "Analytics",
+    "VivaSession",
+    "VivaQuestion",
+    "VivaAnswer",
+    "VivaEvaluation",
+    "Assessment",
+    "AssessmentAssignment",
+    "AssessmentSubmission",
+    "InstructorFeedback",
 ]

@@ -39,6 +39,13 @@ class User(Base):
     analytics = relationship("Analytics", back_populates="user", cascade="all, delete-orphan")
     tutor_interactions = relationship("TutorInteraction", back_populates="user", cascade="all, delete-orphan")
     goals = relationship("Goal", back_populates="user", cascade="all, delete-orphan")
+    study_plan_tasks = relationship("StudyPlanTask", back_populates="user", cascade="all, delete-orphan")
+    viva_sessions = relationship("VivaSession", back_populates="user", cascade="all, delete-orphan")
+    created_assessments = relationship("Assessment", foreign_keys="[Assessment.instructor_id]", back_populates="instructor", cascade="all, delete-orphan")
+    assigned_assessments = relationship("AssessmentAssignment", foreign_keys="[AssessmentAssignment.instructor_id]", back_populates="instructor", cascade="all, delete-orphan")
+    assessment_submissions = relationship("AssessmentSubmission", foreign_keys="[AssessmentSubmission.student_id]", back_populates="student", cascade="all, delete-orphan")
+    instructor_feedbacks_given = relationship("InstructorFeedback", foreign_keys="[InstructorFeedback.instructor_id]", back_populates="instructor", cascade="all, delete-orphan")
+    instructor_feedbacks_received = relationship("InstructorFeedback", foreign_keys="[InstructorFeedback.student_id]", back_populates="student", cascade="all, delete-orphan")
 
 class Profile(Base):
     __tablename__ = "profiles"

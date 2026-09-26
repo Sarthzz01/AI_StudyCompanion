@@ -469,3 +469,249 @@ def seed_phase3_chunks(db: Session):
 
     db.commit()
     logger.info(f"Phase 3 document chunks seeded: {len(all_seed_chunks)} chunks added.")
+
+def seed_phase9_instructor_data(db: Session):
+    """
+    Seeds additional realistic student cohorts (Beatrice, Carlos, Divya)
+    along with sample Assessments, Submissions, and Feedback so the Instructor Module
+    displays rich, immediate class analytics.
+    """
+    from app.models.assessment import Assessment, AssessmentAssignment, AssessmentSubmission, InstructorFeedback
+    from datetime import timedelta
+
+    # Check if student role exists
+    student_role = db.query(Role).filter(Role.name == "student").first()
+    instructor_user = db.query(User).filter(User.email == "instructor@study.edu").first()
+    if not student_role or not instructor_user:
+        return
+
+    # 1. Additional Students
+    extra_students_data = [
+        {
+            "email": "beatrice@study.edu",
+            "name": "Beatrice Vance",
+            "bio": "Distinguished scholar focusing on Distributed Consensus & Database Systems.",
+            "study_mins": 480,
+            "streak": 12,
+            "topics": [
+                {"topic": "Deadlocks", "mastery": 92.0, "quiz": 95.0, "flashcard": 90.0, "viva": 90.0, "recall": 0.95},
+                {"topic": "Routing Algorithms", "mastery": 88.0, "quiz": 90.0, "flashcard": 85.0, "viva": 88.0, "recall": 0.90},
+                {"topic": "Transactions & ACID", "mastery": 85.0, "quiz": 88.0, "flashcard": 82.0, "viva": 84.0, "recall": 0.88},
+                {"topic": "Tree Traversal", "mastery": 90.0, "quiz": 92.0, "flashcard": 88.0, "viva": 89.0, "recall": 0.92},
+            ]
+        },
+        {
+            "email": "carlos@study.edu",
+            "name": "Carlos Mendez",
+            "bio": "Undergraduate student keen on System Architecture and Network Engineering.",
+            "study_mins": 310,
+            "streak": 5,
+            "topics": [
+                {"topic": "Deadlocks", "mastery": 74.0, "quiz": 75.0, "flashcard": 70.0, "viva": 72.0, "recall": 0.78},
+                {"topic": "Routing Algorithms", "mastery": 68.0, "quiz": 70.0, "flashcard": 65.0, "viva": 66.0, "recall": 0.72},
+                {"topic": "Transactions & ACID", "mastery": 76.0, "quiz": 78.0, "flashcard": 74.0, "viva": 75.0, "recall": 0.80},
+                {"topic": "Tree Traversal", "mastery": 70.0, "quiz": 72.0, "flashcard": 68.0, "viva": 68.0, "recall": 0.75},
+            ]
+        },
+        {
+            "email": "divya@study.edu",
+            "name": "Divya Sharma",
+            "bio": "Second-year CS student focusing on foundational Operating Systems and algorithms.",
+            "study_mins": 140,
+            "streak": 2,
+            "topics": [
+                {"topic": "Deadlocks", "mastery": 45.0, "quiz": 45.0, "flashcard": 40.0, "viva": 48.0, "recall": 0.48},
+                {"topic": "Routing Algorithms", "mastery": 52.0, "quiz": 50.0, "flashcard": 55.0, "viva": 50.0, "recall": 0.55},
+                {"topic": "Transactions & ACID", "mastery": 42.0, "quiz": 40.0, "flashcard": 45.0, "viva": 40.0, "recall": 0.44},
+                {"topic": "Tree Traversal", "mastery": 55.0, "quiz": 58.0, "flashcard": 52.0, "viva": 54.0, "recall": 0.58},
+            ]
+        }
+    ]
+
+    for item in extra_students_data:
+        existing = db.query(User).filter(User.email == item["email"]).first()
+        if not existing:
+            u = User(
+                email=item["email"],
+                hashed_password=hash_password("password123"),
+                role_id=student_role.id,
+                is_active=True
+            )
+            db.add(u)
+            db.commit()
+            db.refresh(u)
+
+            prof = Profile(
+                user_id=u.id,
+                full_name=item["name"],
+                bio=item["bio"],
+                preferences_json={"difficulty": "medium", "sessionLength": "30"}
+            )
+            prog = Progress(
+                user_id=u.id,
+                total_study_time_minutes=item["study_mins"],
+                current_streak_days=item["streak"],
+                last_active=datetime.utcnow()
+            )
+            db.add_all([prof, prog])
+            db.commit()
+
+            # Add LearnerModel records
+            for t in item["topics"]:
+                lm = LearnerModel(
+                    user_id=u.id,
+                    topic=t["topic"],
+                    mastery=t["mastery"],
+                    quiz_accuracy=t["quiz"],
+                    flashcard_performance=t["flashcard"],
+                    viva_performance=t["viva"],
+                    recall_reliability=t["recall"],
+                    last_reviewed=datetime.utcnow() - timedelta(days=1),
+                    next_review=datetime.utcnow() + timedelta(days=3)
+                )
+                db.add(lm)
+            db.commit()
+
+    # 2. Sample Assessment
+    sample_assessment = db.query(Assessment).filter(Assessment.instructor_id == instructor_user.id).first()
+    if not sample_assessment:
+        sample_assessment = Assessment(
+            instructor_id=instructor_user.id,
+            title="Midterm Assessment: Concurrency & Deadlock Mechanics",
+            description="Comprehensive evaluation of deadlock conditions, Banker's Algorithm, and prevention strategies.",
+            topic="Deadlocks",
+            difficulty="medium",
+            time_limit_minutes=25,
+            total_points=100,
+            pass_percentage=60.0,
+            questions_json=[
+                {
+                    "id": 1,
+                    "question_text": "Which condition is NOT one of the four Coffman conditions necessary for deadlock to occur?",
+                    "question_type": "multiple_choice",
+                    "options": [
+                        "Mutual Exclusion",
+                        "Preemption Allowed",
+                        "Hold and Wait",
+                        "Circular Wait"
+                    ],
+                    "correct_answer": 1,
+                    "points": 25,
+                    "explanation": "No preemption is the required condition; allowing preemption eliminates deadlock.",
+                    "concept_tested": "Coffman Conditions",
+                    "difficulty": "easy"
+                },
+                {
+                    "id": 2,
+                    "question_text": "What is the primary operational mechanism of the Banker's Algorithm?",
+                    "question_type": "multiple_choice",
+                    "options": [
+                        "To dynamically verify that granting a resource request leaves the system in a safe state.",
+                        "To terminate threads immediately when circular wait is detected.",
+                        "To enforce strict global total ordering on all resource acquisition requests.",
+                        "To serialize all concurrent requests through a single atomic lock."
+                    ],
+                    "correct_answer": 0,
+                    "points": 25,
+                    "explanation": "The Banker's Algorithm checks if a safe allocation sequence exists before allocating.",
+                    "concept_tested": "Deadlock Avoidance",
+                    "difficulty": "medium"
+                },
+                {
+                    "id": 3,
+                    "question_text": "How does imposing a total ordering on resource allocation prevent deadlocks?",
+                    "question_type": "multiple_choice",
+                    "options": [
+                        "It eliminates the Circular Wait condition by ensuring cycles cannot form in the resource graph.",
+                        "It makes resources non-exclusive so multiple processes can access them simultaneously.",
+                        "It allows the operating system to preempt held locks without transaction rollback.",
+                        "It automatically doubles available system resources when contention arises."
+                    ],
+                    "correct_answer": 0,
+                    "points": 25,
+                    "explanation": "Imposing an order on resource acquisition prevents circular wait chains from forming.",
+                    "concept_tested": "Deadlock Prevention",
+                    "difficulty": "medium"
+                },
+                {
+                    "id": 4,
+                    "question_text": "In Resource Allocation Graph (RAG) analysis with multiple instances per resource type, a cycle indicates:",
+                    "question_type": "multiple_choice",
+                    "options": [
+                        "A potential deadlock, but not a guaranteed deadlock unless all instances are tied up.",
+                        "A guaranteed immediate deadlock under all conditions.",
+                        "A guaranteed safe state with optimal throughput.",
+                        "A memory leak in the kernel scheduler."
+                    ],
+                    "correct_answer": 0,
+                    "points": 25,
+                    "explanation": "With multiple instances, a cycle is a necessary but not sufficient condition for deadlock.",
+                    "concept_tested": "RAG Graph Theory",
+                    "difficulty": "hard"
+                }
+            ],
+            is_published=True
+        )
+        db.add(sample_assessment)
+        db.commit()
+        db.refresh(sample_assessment)
+
+        # Create Assignment
+        assignment = AssessmentAssignment(
+            assessment_id=sample_assessment.id,
+            instructor_id=instructor_user.id,
+            assigned_to_all=True,
+            due_date=datetime.utcnow() + timedelta(days=7),
+            instructions="Complete this assessment in one sitting. Review Deadlock Coffman conditions beforehand.",
+            status="active"
+        )
+        db.add(assignment)
+        db.commit()
+        db.refresh(assignment)
+
+        # Seed Sample Submissions
+        all_students = db.query(User).filter(User.role_id == student_role.id).all()
+        score_mappings = {
+            "student@study.edu": (75.0, True),
+            "beatrice@study.edu": (100.0, True),
+            "carlos@study.edu": (75.0, True),
+            "divya@study.edu": (50.0, False),
+        }
+        for st in all_students:
+            score_info = score_mappings.get(st.email, (70.0, True))
+            sub = AssessmentSubmission(
+                assessment_id=sample_assessment.id,
+                assignment_id=assignment.id,
+                student_id=st.id,
+                score=score_info[0],
+                total_points=100,
+                percentage=score_info[0],
+                passed=score_info[1],
+                time_spent_seconds=920,
+                answers_json=[],
+                status="graded",
+                submitted_at=datetime.utcnow() - timedelta(hours=12)
+            )
+            db.add(sub)
+
+        # Seed Sample Feedback
+        divya = db.query(User).filter(User.email == "divya@study.edu").first()
+        if divya:
+            fb = InstructorFeedback(
+                instructor_id=instructor_user.id,
+                student_id=divya.id,
+                assessment_id=sample_assessment.id,
+                topic="Deadlocks",
+                feedback_type="topic_intervention",
+                feedback_text="Divya, your score on Deadlocks indicates a need to review the four Coffman conditions and the difference between prevention and avoidance algorithms. I recommend doing active recall flashcards.",
+                action_items_json=[
+                    "Review Coffman conditions lecture notes",
+                    "Complete 10 Deadlock flashcards in AI Companion",
+                    "Retake a 5-question Deadlock quiz"
+                ],
+                is_read=False
+            )
+            db.add(fb)
+
+        db.commit()
+        logger.info("Phase 9 Instructor seed data successfully created.")

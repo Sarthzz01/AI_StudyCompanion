@@ -12,6 +12,8 @@ class ProgressStats(BaseModel):
     flashcardPerformance: Optional[int] = 0
     recallReliability: Optional[int] = 50
     averageMastery: Optional[int] = 0
+    vivaSessionsCount: Optional[int] = 0
+    averageVivaScore: Optional[float] = 0.0
 
 class PerformanceOverTimeEntry(BaseModel):
     date: str
@@ -41,6 +43,7 @@ class ProgressOut(BaseModel):
     strongTopics: List[str]
     weakTopics: List[str]
     topicsNeedingReview: List[Dict[str, Any]]
+    vivaPerformance: Optional[List[Dict[str, Any]]] = []
 
 class TopicProgressOut(BaseModel):
     id: int

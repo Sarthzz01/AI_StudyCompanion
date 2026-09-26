@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -46,11 +46,16 @@ class RevisionSchedule(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     topic_id = Column(Integer, ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True)
+    topic_name = Column(String(200), nullable=True, index=True)
+    material_id = Column(String(100), nullable=True)
     scheduled_date = Column(DateTime, nullable=False, index=True)
     status = Column(String(50), default="pending", nullable=False)  # pending, completed, skipped
     interval_days = Column(Integer, default=1, nullable=False)
+    repetition_count = Column(Integer, default=1, nullable=False)
     ease_factor = Column(Float, default=2.5, nullable=False)  # SuperMemo SM-2 algorithm ease factor
+    last_reviewed = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="revision_schedules")
 
@@ -67,3 +72,26 @@ class Recommendation(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="recommendations")
+
+class StudyPlanTask(Base):
+    __tablename__ = "study_plan_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    plan_date = Column(String(20), nullable=False, index=True)  # "YYYY-MM-DD"
+    task_title = Column(String(255), nullable=False)
+    topic = Column(String(200), nullable=False)
+    material_id = Column(String(100), nullable=True)
+    activity = Column(String(50), default="quiz", nullable=False)  # quiz, flashcards, summary, tutor, reading
+    duration_minutes = Column(Integer, default=20, nullable=False)
+    priority = Column(String(50), default="medium", nullable=False)  # high, medium, low
+    difficulty = Column(String(50), default="medium", nullable=False)  # easy, medium, hard
+    completed = Column(Boolean, default=False, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    reason = Column(Text, nullable=True)
+    action_url = Column(String(500), nullable=True)
+    order_index = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user = relationship("User", back_populates="study_plan_tasks")

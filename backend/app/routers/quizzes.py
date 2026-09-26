@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.material import Material
 from app.models.document import DocumentChunk
-from app.models.study import Quiz, Question, QuizAttempt, QuizAnswer, Performance
+from app.models.study import Quiz, Question, QuizAttempt, QuizAnswer, Performance, Notification
 from app.models.learner import LearnerModel, Progress
 from app.schemas.quiz import (
     QuizGenerateRequest,
@@ -331,6 +331,8 @@ def submit_quiz_attempt(
     questions_by_id = {q.id: q for q in quiz.questions}
     submitted_map = {item.question_id: item.selected_option for item in payload.answers}
 
+    was_already_completed = (attempt.status == "completed")
+
     # Delete previous answers if re-submitting
     db.query(QuizAnswer).filter(QuizAnswer.attempt_id == attempt.id).delete()
     db.query(Performance).filter(Performance.quiz_attempt_id == attempt.id).delete()
@@ -438,8 +440,9 @@ def submit_quiz_attempt(
     attempt.topic_results_json = topic_results
     attempt.difficulty_results_json = difficulty_results
 
-    # Update LearnerModel for each tested topic using LearnerService
+    # Update LearnerModel and SM-2 Revision Schedules for each tested topic
     from app.services.learner_service import learner_service
+    from app.services.revision_service import revision_service
     for topic_name, res in topic_results.items():
         learner_service.update_topic_after_quiz(
             db=db,
@@ -448,6 +451,14 @@ def submit_quiz_attempt(
             score=res["correct"],
             total=res["total"],
             difficulty=attempt.difficulty or "medium"
+        )
+        revision_service.update_revision_after_quiz(
+            db=db,
+            user_id=current_user.id,
+            topic_name=topic_name,
+            score=res["correct"],
+            total=res["total"],
+            material_id=attempt.material_id
         )
 
     # Update User Progress and Study Session
@@ -500,6 +511,19 @@ def submit_quiz_attempt(
             "total": total_count
         })
         progress.history_json = history[-15:]
+
+    # Create persistent Notification (with duplicate prevention)
+    if not was_already_completed:
+        topic_label = attempt.topic or (quiz.material.title if quiz and quiz.material else "Quiz")
+        notif = Notification(
+            user_id=current_user.id,
+            title="Quiz Completed",
+            message=f"{topic_label}: Scored {correct_count}/{total_count} ({accuracy}% accuracy).",
+            type="quiz",
+            is_read=False,
+            created_at=datetime.utcnow()
+        )
+        db.add(notif)
 
     db.commit()
     db.refresh(attempt)

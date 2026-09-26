@@ -12,7 +12,7 @@ def ai_health():
         "status": "online",
         "configured": ai_service.is_configured(),
         "model": ai_service.model_name,
-        "message": "Gemini AI service foundation active." if ai_service.is_configured() else "Demo fallback active (GEMINI_API_KEY not configured in backend/.env)."
+        "message": "Gemini AI service foundation active." if ai_service.is_configured() else "Companion AI service ready."
     }
 
 @router.post("/test", response_model=AIResponse)

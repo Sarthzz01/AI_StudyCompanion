@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.learner import LearnerModel, Progress
-from app.models.study import StudySession, Goal, QuizAttempt, QuizAnswer
+from app.models.study import StudySession, Goal, QuizAttempt, QuizAnswer, Notification
 from app.schemas.progress import (
     ProgressOut,
     TopicProgressOut,
@@ -372,9 +372,19 @@ def update_goal(
     if payload.current is not None:
         goal.current = payload.current
     if payload.completed is not None:
+        was_completed = goal.completed
         goal.completed = payload.completed
-        if goal.completed:
+        if goal.completed and not was_completed:
             goal.current = goal.target
+            notif = Notification(
+                user_id=current_user.id,
+                title="Study Goal Completed",
+                message=f"Congratulations! You completed the goal: '{goal.title}'.",
+                type="goal",
+                is_read=False,
+                created_at=datetime.utcnow()
+            )
+            db.add(notif)
 
     db.commit()
     db.refresh(goal)

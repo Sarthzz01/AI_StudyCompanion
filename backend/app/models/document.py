@@ -37,7 +37,9 @@ class TutorInteraction(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    material_id = Column(String(100), ForeignKey("materials.id", ondelete="CASCADE"), nullable=False, index=True)
+    material_id = Column(String(100), ForeignKey("materials.id", ondelete="CASCADE"), nullable=True, index=True)
+    conversation_id = Column(String(100), index=True, nullable=True)
+    title = Column(String(255), nullable=True)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
     grounded = Column(Boolean, default=True, nullable=False)

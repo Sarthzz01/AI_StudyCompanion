@@ -580,6 +580,115 @@ class LearnerService:
         db.refresh(learner)
         return learner
 
+    def update_topic_after_viva(
+        self,
+        db: Session,
+        user_id: int,
+        topic_name: str,
+        score: float,
+        duration_minutes: int = 15
+    ) -> LearnerModel:
+        """
+        Updates topic LearnerModel and Progress following an AI Viva / Technical Interview session.
+        Calculates updated viva_performance, recall reliability, and composite mastery.
+        """
+        canonical_topic = self.normalize_topic_name(topic_name, db)
+        topic_obj = db.query(Topic).filter(Topic.name == canonical_topic).first()
+        topic_id = topic_obj.id if topic_obj else None
+
+        learner = db.query(LearnerModel).filter(
+            LearnerModel.user_id == user_id,
+            LearnerModel.topic == canonical_topic
+        ).first()
+
+        now = datetime.utcnow()
+        date_str = now.strftime("%Y-%m-%d")
+
+        if not learner:
+            new_viva = score
+            new_recall = min(1.0, max(0.3, round(0.5 + 0.4 * (score / 100.0), 2)))
+            new_mastery = round(0.75 * new_viva + 0.25 * (new_recall * 100.0), 1)
+            history = [{"type": "viva", "score": score, "date": date_str}]
+
+            interval_days = self._calculate_review_interval(new_mastery, new_recall)
+            learner = LearnerModel(
+                user_id=user_id,
+                topic_id=topic_id,
+                topic=canonical_topic,
+                quiz_accuracy=0.0,
+                flashcard_performance=0.0,
+                viva_performance=new_viva,
+                recall_reliability=new_recall,
+                mastery=min(100.0, max(0.0, new_mastery)),
+                difficulty="hard" if score >= 80 else ("easy" if score < 50 else "medium"),
+                last_reviewed=now,
+                next_review=now + timedelta(days=interval_days),
+                recent_performance_json=history
+            )
+            db.add(learner)
+        else:
+            prev_viva = learner.viva_performance or 0.0
+            new_viva = round(0.7 * score + 0.3 * prev_viva, 1) if prev_viva > 0 else score
+
+            prev_recall = learner.recall_reliability or 0.5
+            if score >= 75.0:
+                new_recall = min(1.0, round(0.6 * prev_recall + 0.4 * (score / 100.0) + 0.05, 2))
+            elif score < 50.0:
+                new_recall = max(0.2, round(0.7 * prev_recall + 0.3 * (score / 100.0), 2))
+            else:
+                new_recall = round(0.7 * prev_recall + 0.3 * (score / 100.0), 2)
+
+            quiz_acc = learner.quiz_accuracy or 0.0
+            fc_perf = learner.flashcard_performance or 0.0
+
+            # Dynamic composite mastery calculation
+            if quiz_acc > 0 and fc_perf > 0:
+                new_mastery = round(0.35 * quiz_acc + 0.25 * fc_perf + 0.25 * new_viva + 0.15 * (new_recall * 100.0), 1)
+            elif quiz_acc > 0:
+                new_mastery = round(0.45 * quiz_acc + 0.35 * new_viva + 0.20 * (new_recall * 100.0), 1)
+            elif fc_perf > 0:
+                new_mastery = round(0.40 * fc_perf + 0.40 * new_viva + 0.20 * (new_recall * 100.0), 1)
+            else:
+                new_mastery = round(0.75 * new_viva + 0.25 * (new_recall * 100.0), 1)
+
+            history = list(learner.recent_performance_json or [])
+            history.append({"type": "viva", "score": score, "date": date_str})
+            learner.recent_performance_json = history[-10:]
+
+            learner.topic = canonical_topic
+            if topic_id:
+                learner.topic_id = topic_id
+            learner.viva_performance = new_viva
+            learner.recall_reliability = new_recall
+            learner.mastery = min(100.0, max(0.0, new_mastery))
+            learner.difficulty = "hard" if score >= 80 else ("easy" if score < 50 else "medium")
+            learner.last_reviewed = now
+
+            interval_days = self._calculate_review_interval(new_mastery, new_recall)
+            learner.next_review = now + timedelta(days=interval_days)
+
+        # Update Progress
+        progress = db.query(Progress).filter(Progress.user_id == user_id).first()
+        if progress:
+            progress.total_study_time_minutes = (progress.total_study_time_minutes or 0) + duration_minutes
+            progress.last_active = now
+        else:
+            progress = Progress(
+                user_id=user_id,
+                overall_accuracy=0.0,
+                total_study_time_minutes=duration_minutes,
+                questions_attempted=0,
+                quizzes_completed=0,
+                current_streak_days=1,
+                last_active=now,
+                history_json=[]
+            )
+            db.add(progress)
+
+        db.commit()
+        db.refresh(learner)
+        return learner
+
     def update_after_study_session(
         self,
         db: Session,
@@ -768,6 +877,26 @@ class LearnerService:
         avg_recall = round(sum(lm.recall_reliability for lm in learner_models) / len(learner_models), 2) if learner_models else 0.5
         recall_pct = int(round(avg_recall * 100))
 
+        # Query AI Viva sessions for oral interview analytics
+        from app.models.viva import VivaSession
+        viva_sessions = db.query(VivaSession).filter(
+            VivaSession.user_id == user_id,
+            VivaSession.status == "completed"
+        ).order_by(VivaSession.completed_at.desc(), VivaSession.id.desc()).all()
+
+        viva_count = len(viva_sessions)
+        avg_viva_score = round(sum(s.overall_score for s in viva_sessions) / viva_count, 1) if viva_count > 0 else 0.0
+        viva_perf = [
+            {
+                "id": s.id,
+                "topic": s.topic,
+                "mode": s.mode,
+                "score": round(s.overall_score, 1),
+                "date": s.completed_at.strftime("%b %d") if s.completed_at else "Recent"
+            }
+            for s in viva_sessions[:6]
+        ]
+
         return {
             "stats": {
                 "accuracy": int(round(overall_acc)),
@@ -778,7 +907,9 @@ class LearnerService:
                 "overallProgress": int(overall_progress),
                 "flashcardPerformance": int(round(avg_fc)),
                 "recallReliability": int(recall_pct),
-                "averageMastery": int(round(avg_mastery))
+                "averageMastery": int(round(avg_mastery)),
+                "vivaSessionsCount": int(viva_count),
+                "averageVivaScore": float(avg_viva_score)
             },
             "performanceOverTime": performance_over_time,
             "topicAccuracy": topic_accuracy,
@@ -786,7 +917,8 @@ class LearnerService:
             "recentlyImproved": detections["improving"][:3],
             "strongTopics": detections["strong"],
             "weakTopics": detections["weak"],
-            "topicsNeedingReview": detections["needing_review"]
+            "topicsNeedingReview": detections["needing_review"],
+            "vivaPerformance": viva_perf
         }
 
 learner_service = LearnerService()

@@ -201,6 +201,15 @@ def review_flashcard(
         rating=rating_str
     )
 
+    from app.services.revision_service import revision_service
+    revision_service.update_revision_after_flashcard(
+        db=db,
+        user_id=current_user.id,
+        topic_name=topic_name,
+        rating=rating_str,
+        material_id=card.material_id
+    )
+
     # Track analytics event
     event = Analytics(
         user_id=current_user.id,

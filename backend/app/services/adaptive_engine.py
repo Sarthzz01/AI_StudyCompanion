@@ -110,9 +110,9 @@ class AdaptiveEngine:
         elif any(k in topic_lower for k in ["sql", "relational", "normali", "er model", "transaction", "index"]):
             return "dbms"
         elif any(k in topic_lower for k in ["process", "thread", "scheduling", "deadlock", "memory", "paging", "file"]):
-            return "os"
-        elif any(k in topic_lower for k in ["osi", "tcp", "udp", "routing", "ip", "protocol"]):
-            return "cn"
+            return "operating-systems"
+        elif any(k in topic_lower for k in ["osi", "tcp", "udp", "routing", "ip", "protocol", "network", "signal", "link"]):
+            return "computer-networks"
 
         return materials[0].id if materials else "data-structures"
 
