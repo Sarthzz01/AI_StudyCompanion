@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Search, Upload, Library } from 'lucide-react'
+import { Search, Upload, Library, Trash2, AlertTriangle } from 'lucide-react'
 import PageHeader from '../components/PageHeader.jsx'
 import MaterialCard from '../components/MaterialCard.jsx'
 import Button from '../components/Button.jsx'
@@ -227,6 +227,58 @@ export default function Materials() {
             </div>
           )}
         </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={Boolean(deleteTarget)}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        title="Delete study material"
+        description="Permanent removal confirmation"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteConfirm}
+              loading={deleting}
+              icon={Trash2}
+            >
+              Delete document
+            </Button>
+          </>
+        }
+      >
+        {deleteTarget && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50/80 p-4 dark:border-rose-900/60 dark:bg-rose-950/30">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-300">
+                <AlertTriangle size={18} />
+              </span>
+              <div>
+                <h4 className="text-sm font-semibold text-rose-900 dark:text-rose-200">
+                  Are you sure you want to delete this material?
+                </h4>
+                <p className="mt-1 text-xs leading-relaxed text-rose-700 dark:text-rose-300">
+                  You are about to delete <strong className="font-semibold">{deleteTarget.title}</strong>. This will permanently erase the document, its extracted text, RAG vector embeddings, generated summaries, and related study data.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-ink-200 bg-ink-50/60 p-3.5 text-xs text-ink-600 dark:border-ink-800 dark:bg-ink-800/40 dark:text-ink-300">
+              <span className="font-medium text-ink-800 dark:text-white">Document title:</span> {deleteTarget.title}
+              <br />
+              <span className="font-medium text-ink-800 dark:text-white">Type:</span> {deleteTarget.type || 'PDF'}
+              {deleteTarget.pages ? <> &middot; {deleteTarget.pages} pages</> : null}
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   )

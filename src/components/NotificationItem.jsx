@@ -1,4 +1,17 @@
-import { Check, Trophy, Sparkles, FileText, ClipboardCheck, Mic, CalendarClock, BookOpen, AlertCircle, MessageSquare } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import {
+  Check,
+  Trophy,
+  Sparkles,
+  FileText,
+  ClipboardCheck,
+  Mic,
+  CalendarClock,
+  BookOpen,
+  AlertCircle,
+  MessageSquare,
+  ArrowRight,
+} from 'lucide-react'
 
 const typeIcon = {
   quiz: ClipboardCheck,
@@ -15,6 +28,11 @@ const typeIcon = {
 
 export default function NotificationItem({ notification, onMarkRead }) {
   const Icon = typeIcon[notification.type] || Sparkles
+  const isAssessmentNotif =
+    notification.title?.toLowerCase().includes('assessment') ||
+    notification.type === 'assessment' ||
+    (notification.type === 'quiz' && notification.title?.toLowerCase().includes('assign'))
+
   return (
     <div
       className={`flex items-start gap-3 rounded-xl border p-4 ${
@@ -28,10 +46,23 @@ export default function NotificationItem({ notification, onMarkRead }) {
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <h4 className="text-sm font-semibold">{notification.title}</h4>
+          <h4 className="text-sm font-semibold text-ink-900 dark:text-white">{notification.title}</h4>
           {!notification.read && <span className="h-2 w-2 rounded-full bg-brand-600" aria-label="Unread" />}
         </div>
-        <p className="muted mt-1">{notification.body}</p>
+        <p className="muted mt-1 text-xs leading-relaxed">{notification.body || notification.message}</p>
+
+        {isAssessmentNotif && (
+          <div className="mt-2">
+            <Link
+              to="/quizzes?tab=assigned"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 hover:underline"
+            >
+              <span>Open in Quizzes & Assessments</span>
+              <ArrowRight size={12} />
+            </Link>
+          </div>
+        )}
+
         <p className="mt-2 text-xs text-ink-400">{notification.time}</p>
       </div>
       {!notification.read && (

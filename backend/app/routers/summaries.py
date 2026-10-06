@@ -1,6 +1,6 @@
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -144,6 +144,10 @@ def generate_summary_endpoint(
         force_refresh=True
     )
 
+    mat.last_studied = datetime.utcnow().isoformat()
+    mat.updated_at = datetime.utcnow()
+    db.commit()
+
     sections = [
         SummarySection(
             id=s["id"],
@@ -162,3 +166,103 @@ def generate_summary_endpoint(
         keyConcepts=res.get("keyConcepts", []),
         sections=sections
     )
+
+@router.post("/upload-pdf", response_model=SummaryOut, status_code=status.HTTP_201_CREATED)
+async def upload_pdf_and_summarize(
+    file: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Upload any PDF document, parse its text content with PyPDF,
+    store as a Study Material, index RAG chunks, and generate an in-depth AI study summary.
+    """
+    import time
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty."
+        )
+
+    filename = file.filename or "uploaded-document.pdf"
+    
+    mat_title = title.strip() if title and title.strip() else filename
+    if mat_title == filename and "." in mat_title:
+        mat_title = mat_title.rsplit(".", 1)[0].replace("-", " ").replace("_", " ").title()
+
+    slug = mat_title.lower().replace(" ", "-").replace("&", "and")
+    clean_slug = "".join(c for c in slug if c.isalnum() or c == "-").strip("-")
+    unique_id = clean_slug if clean_slug and not db.query(Material).filter(Material.id == clean_slug).first() else f"mat-{int(time.time())}"
+
+    # Create Material entry
+    new_mat = Material(
+        id=unique_id,
+        user_id=current_user.id,
+        title=mat_title,
+        type="PDF",
+        pages=1,
+        topics_count=1,
+        last_studied="Just now",
+        progress=0,
+        color="brand",
+        description=f"AI Summarized document from '{filename}'",
+        raw_filename=filename,
+        processing_status="processing",
+        topics_json=[{"name": f"{mat_title} Overview", "progress": 0}],
+        recent_activity_json=[
+            {
+                "id": 1,
+                "label": f"Summarized {mat_title}",
+                "detail": f"{filename} uploaded and summarized with AI",
+                "time": "Just now"
+            }
+        ]
+    )
+    db.add(new_mat)
+    db.commit()
+    db.refresh(new_mat)
+
+    # Index material chunks for RAG
+    try:
+        rag_service.index_material(
+            db=db,
+            material=new_mat,
+            file_bytes=file_bytes,
+            filename=filename
+        )
+    except Exception as e:
+        logger.error(f"Error indexing uploaded PDF for summary: {e}")
+        new_mat.processing_status = "ready"
+        db.commit()
+
+    db.refresh(new_mat)
+
+    # Generate the AI summary
+    res = rag_service.generate_summary(
+        db=db,
+        user=current_user,
+        material_id=new_mat.id,
+        force_refresh=True
+    )
+
+    sections = [
+        SummarySection(
+            id=s["id"],
+            title=s["title"],
+            body=s["body"],
+            points=s.get("points", [])
+        )
+        for s in res.get("sections", [])
+    ]
+
+    return SummaryOut(
+        id=res["id"],
+        materialId=res["materialId"],
+        materialTitle=res.get("materialTitle", new_mat.title),
+        generatedAt=res["generatedAt"],
+        keyConcepts=res.get("keyConcepts", []),
+        sections=sections
+    )
+

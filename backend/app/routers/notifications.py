@@ -120,6 +120,7 @@ def get_notifications(
             id=n.id,
             title=n.title,
             body=n.message,
+            message=n.message,
             type=n.type,
             read=n.is_read,
             time=format_relative_time(n.created_at),

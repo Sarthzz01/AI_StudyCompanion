@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, GraduationCap } from 'lucide-react'
 import Input from '../components/Input.jsx'
 import Button from '../components/Button.jsx'
+import ForgotPasswordModal from '../components/ForgotPasswordModal.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -17,6 +18,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
+  const [forgotModalOpen, setForgotModalOpen] = useState(false)
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
@@ -111,7 +113,7 @@ export default function Login() {
               </label>
               <button
                 type="button"
-                onClick={() => toast('Password reset link sent if registered.', 'info')}
+                onClick={() => setForgotModalOpen(true)}
                 className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
               >
                 Forgot password?
@@ -130,11 +132,12 @@ export default function Login() {
             </Link>
           </p>
         </div>
-
-        <p className="mt-4 text-center text-xs text-ink-500">
-          Default password for seeded accounts: <code className="bg-ink-100 dark:bg-ink-800 px-1 py-0.5 rounded text-ink-700 dark:text-ink-300">password123</code>
-        </p>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={forgotModalOpen}
+        onClose={() => setForgotModalOpen(false)}
+      />
     </div>
   )
 }

@@ -37,6 +37,18 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     
+    # Frontend URL (for password reset and email links)
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    
+    # SMTP Configuration (Optional - sends real emails if host/credentials are supplied)
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "noreply@aistudycompanion.com")
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "AI Study Companion")
+    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
+    
     class Config:
         env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
         extra = "allow"

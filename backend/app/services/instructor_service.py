@@ -513,7 +513,11 @@ class InstructorService:
         title = assessment.title if assessment else "New Assessment"
 
         if req.assigned_to_all:
-            students = db.query(User).join(Role).filter(Role.name == "student").all()
+            student_role = db.query(Role).filter(Role.name == "student").first()
+            if student_role:
+                students = db.query(User).filter(User.role_id == student_role.id).all()
+            else:
+                students = db.query(User).filter(User.email != "instructor@study.edu", User.email != "admin@study.edu").all()
             for s in students:
                 notif = Notification(
                     user_id=s.id,

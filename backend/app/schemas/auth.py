@@ -25,3 +25,15 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserAuthResponse
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6)
+
+class PasswordResetResponse(BaseModel):
+    message: str
+    dev_reset_link: Optional[str] = None
+

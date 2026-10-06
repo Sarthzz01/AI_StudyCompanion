@@ -11,6 +11,7 @@ class NotificationOut(BaseModel):
     id: int
     title: str
     body: str  # maps to message column for frontend consistency
+    message: Optional[str] = None
     type: str
     read: bool  # maps to is_read column
     time: str

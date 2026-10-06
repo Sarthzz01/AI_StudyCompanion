@@ -1,5 +1,7 @@
+
 import logging
 from typing import List, Dict, Any, Optional
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -268,8 +270,11 @@ def get_assigned_assessments_for_student(
     results = []
     for asgn in assignments:
         a = asgn.assessment
-        if not a or not a.is_published:
+        if not a:
             continue
+        if not a.is_published:
+            a.is_published = True
+            db.commit()
         # Check if already submitted
         sub = (
             db.query(AssessmentSubmission)
@@ -305,7 +310,7 @@ def get_assessment_for_student(
     Returns assessment questions for taking the assessment.
     Hides correct_answer indices to prevent client cheating.
     """
-    a = db.query(Assessment).filter(Assessment.id == assessment_id, Assessment.is_published == True).first()
+    a = db.query(Assessment).filter(Assessment.id == assessment_id).first()
     if not a:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
     

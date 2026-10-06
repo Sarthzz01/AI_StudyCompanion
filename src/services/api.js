@@ -78,6 +78,16 @@ export async function getCurrentUser() {
   return data
 }
 
+export async function requestPasswordReset(email) {
+  const { data } = await http.post('/auth/forgot-password', { email })
+  return data
+}
+
+export async function resetPassword({ token, new_password }) {
+  const { data } = await http.post('/auth/reset-password', { token, new_password })
+  return data
+}
+
 /* -------------------------------- profile --------------------------------- */
 
 export async function getProfile() {
@@ -913,6 +923,7 @@ export async function getAssignedAssessments() {
     return []
   }
 }
+export const getStudentAssignedAssessments = getAssignedAssessments
 
 export async function getAssessmentForStudent(assessmentId) {
   try {
@@ -923,6 +934,7 @@ export async function getAssessmentForStudent(assessmentId) {
     throw err
   }
 }
+export const getStudentAssessment = getAssessmentForStudent
 
 export async function submitStudentAssessment(assessmentId, payload) {
   try {
@@ -1081,4 +1093,24 @@ export async function generateStructuredNote({ content_or_prompt, topic }) {
   const { data } = await http.post('/notes/generate', { content_or_prompt, topic })
   return data
 }
+
+/* --------------------------- PDF summarization --------------------------- */
+
+export async function uploadAndSummarizePdf(file, title, onProgress) {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (title) formData.append('title', title)
+
+  const config = {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }
+  if (typeof onProgress === 'function') {
+    config.onUploadProgress = onProgress
+  }
+
+  const { data } = await http.post('/summaries/upload-pdf', formData, config)
+  return data
+}
+
+
 

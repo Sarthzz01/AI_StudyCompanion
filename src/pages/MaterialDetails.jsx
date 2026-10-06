@@ -1,21 +1,26 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Bot, FileText, Layers, ClipboardCheck, ArrowLeft, Activity } from 'lucide-react'
+import { Bot, FileText, Layers, ClipboardCheck, ArrowLeft, Activity, Trash2, AlertTriangle } from 'lucide-react'
 import PageHeader from '../components/PageHeader.jsx'
 import Card, { CardHeader } from '../components/Card.jsx'
 import ProgressBar from '../components/ProgressBar.jsx'
 import Button from '../components/Button.jsx'
+import Modal from '../components/Modal.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import ErrorState from '../components/ErrorState.jsx'
 import EmptyState from '../components/EmptyState.jsx'
-import { getMaterial } from '../services/api.js'
+import { getMaterial, deleteMaterial } from '../services/api.js'
+import { useToast } from '../context/ToastContext.jsx'
 
 export default function MaterialDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const toast = useToast()
   const [material, setMaterial] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -26,6 +31,19 @@ export default function MaterialDetails() {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!material) return
+    setDeleting(true)
+    try {
+      await deleteMaterial(material.id)
+      toast(`'${material.title}' was successfully deleted.`, 'success')
+      navigate('/materials')
+    } catch (err) {
+      toast(err.message || 'Failed to delete material.', 'error')
+      setDeleting(false)
     }
   }
 
@@ -57,15 +75,25 @@ export default function MaterialDetails() {
         title={material.title}
         subtitle={`${material.type} · ${material.pages} pages · ${material.topicsCount} topics · Status: ${material.processing_status || 'ready'}`}
         actions={
-          material.processing_status === 'processing' ? (
-            <span className="chip animate-pulse bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
-              Indexing Chunks…
-            </span>
-          ) : (
-            <span className="chip bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-              Ready for AI Study
-            </span>
-          )
+          <div className="flex items-center gap-2">
+            {material.processing_status === 'processing' ? (
+              <span className="chip animate-pulse bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                Indexing Chunks…
+              </span>
+            ) : (
+              <span className="chip bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                Ready for AI Study
+              </span>
+            )}
+            <Button
+              variant="danger"
+              size="sm"
+              icon={Trash2}
+              onClick={() => setConfirmDelete(true)}
+            >
+              Delete
+            </Button>
+          </div>
         }
       />
 
@@ -145,6 +173,49 @@ export default function MaterialDetails() {
           Test yourself on this material
         </Button>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={confirmDelete}
+        onClose={() => !deleting && setConfirmDelete(false)}
+        title="Delete study material"
+        description="Permanent removal confirmation"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmDelete(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDelete}
+              loading={deleting}
+              icon={Trash2}
+            >
+              Delete document
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50/80 p-4 dark:border-rose-900/60 dark:bg-rose-950/30">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-300">
+              <AlertTriangle size={18} />
+            </span>
+            <div>
+              <h4 className="text-sm font-semibold text-rose-900 dark:text-rose-200">
+                Are you sure you want to delete this material?
+              </h4>
+              <p className="mt-1 text-xs leading-relaxed text-rose-700 dark:text-rose-300">
+                You are about to delete <strong className="font-semibold">{material.title}</strong>. This will permanently remove the document, all RAG vector embeddings, summaries, and associated interactions.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }

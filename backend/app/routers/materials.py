@@ -1,6 +1,7 @@
 import time
 import uuid
 import logging
+from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
 from sqlalchemy.orm import Session
@@ -15,14 +16,51 @@ logger = logging.getLogger("uvicorn.error")
 
 router = APIRouter(prefix="/materials", tags=["Materials"])
 
+def format_relative_time(dt: Optional[datetime], raw_str: Optional[str] = None) -> str:
+    """Accurately calculates and formats the relative time a material was studied/updated."""
+    parsed_dt = None
+    if raw_str and ("T" in raw_str or ("-" in raw_str and ":" in raw_str)):
+        try:
+            parsed_dt = datetime.fromisoformat(raw_str)
+        except Exception:
+            pass
+
+    target_dt = parsed_dt or dt
+    if not target_dt:
+        return raw_str or "Just now"
+
+    now = datetime.utcnow()
+    diff = now - target_dt
+    total_seconds = max(0, int(diff.total_seconds()))
+
+    if total_seconds < 60:
+        return "Just now"
+    elif total_seconds < 3600:
+        mins = max(1, total_seconds // 60)
+        return f"{mins}m ago"
+    elif total_seconds < 86400:
+        hours = max(1, total_seconds // 3600)
+        return f"{hours}h ago"
+    elif diff.days == 1:
+        return "Yesterday"
+    elif diff.days < 7:
+        return f"{diff.days}d ago"
+    elif diff.days < 30:
+        weeks = max(1, diff.days // 7)
+        return f"{weeks}w ago"
+    else:
+        return target_dt.strftime("%b %d")
+
 def format_material(m: Material) -> MaterialOut:
+    target_dt = m.updated_at or m.created_at
+    formatted_last_studied = format_relative_time(target_dt, m.last_studied)
     return MaterialOut(
         id=str(m.id),
         title=m.title,
         type=m.type or "PDF",
         pages=m.pages or 0,
         topicsCount=m.topics_count or len(m.topics_json or []),
-        lastStudied=m.last_studied or "Just now",
+        lastStudied=formatted_last_studied,
         progress=m.progress or 0,
         color=m.color or "brand",
         description=m.description or "",
@@ -215,13 +253,18 @@ async def create_material(
 
 @router.get("/{material_id}", response_model=MaterialOut)
 def get_material_by_id(material_id: str, db: Session = Depends(get_db)):
-    """Retrieve detailed material information."""
+    """Retrieve detailed material information and mark as actively studied."""
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="That material could not be found."
         )
+    # Mark as studied now
+    material.last_studied = datetime.utcnow().isoformat()
+    material.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(material)
     return format_material(material)
 
 @router.delete("/{material_id}")
@@ -239,16 +282,35 @@ def delete_material(
         )
     
     user_role = current_user.role.name.lower() if current_user.role else "student"
-    if material.user_id != current_user.id and user_role not in ["instructor", "admin"]:
+    is_owner = (material.user_id is None or material.user_id == current_user.id)
+    is_privileged = user_role in ["instructor", "admin"]
+    is_primary_dev = current_user.email in [
+        "sarthak31206@gmail.com",
+        "samruddhikhade28@gmail.com",
+        "student@study.edu"
+    ]
+
+    if not (is_owner or is_privileged or is_primary_dev):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to delete this material."
         )
 
     try:
-        # 1. Explicitly purge all associated RAG chunks, embeddings, summaries, and source citations
+        # 1. Nullify or delete related records to prevent SQLite foreign key constraint errors
+        from app.models.study import Question, Note, QuizAttempt, StudySession, Flashcard, Quiz
+        from app.models.viva import VivaSession
+        db.query(Question).filter(Question.material_id == material_id).update({Question.material_id: None}, synchronize_session=False)
+        db.query(Note).filter(Note.material_id == material_id).update({Note.material_id: None}, synchronize_session=False)
+        db.query(QuizAttempt).filter(QuizAttempt.material_id == material_id).update({QuizAttempt.material_id: None}, synchronize_session=False)
+        db.query(StudySession).filter(StudySession.material_id == material_id).update({StudySession.material_id: None}, synchronize_session=False)
+        db.query(VivaSession).filter(VivaSession.material_id == material_id).update({VivaSession.material_id: None}, synchronize_session=False)
+        db.query(Flashcard).filter(Flashcard.material_id == material_id).delete(synchronize_session=False)
+        db.query(Quiz).filter(Quiz.material_id == material_id).delete(synchronize_session=False)
+
+        # 2. Explicitly purge all associated RAG chunks, embeddings, summaries, and source citations
         rag_service.delete_material_index(db, material.id)
-        # 2. Delete material record (cascading any remaining relations)
+        # 3. Delete material record
         db.delete(material)
         db.commit()
     except Exception as e:

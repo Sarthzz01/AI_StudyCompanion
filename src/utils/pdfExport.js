@@ -245,3 +245,153 @@ export function exportNoteToPDF(note) {
     .slice(0, 40)
   doc.save(`${safeFilename}_Notes.pdf`)
 }
+
+/**
+ * Generates and downloads a beautifully styled PDF from a structured study summary.
+ *
+ * @param {Object} summary - The summary object containing materialTitle, generatedAt, keyConcepts, sections
+ * @param {string} materialTitle - Fallback title of the material
+ */
+export function exportSummaryToPDF(summary, materialTitle = 'Study Material') {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'pt',
+    format: 'a4',
+  })
+
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const margin = 45
+  const contentWidth = pageWidth - margin * 2
+
+  let y = margin
+
+  const ensureSpace = (neededHeight) => {
+    if (y + neededHeight > pageHeight - margin - 30) {
+      doc.addPage()
+      y = margin + 15
+      drawPageHeader()
+    }
+  }
+
+  const drawPageHeader = () => {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(148, 163, 184)
+    doc.text('AI Study Companion — Executive Study Summary', margin, margin - 10)
+    doc.setDrawColor(226, 232, 240)
+    doc.setLineWidth(0.5)
+    doc.line(margin, margin - 5, pageWidth - margin, margin - 5)
+  }
+
+  // Top Decorative Brand Bar
+  doc.setFillColor(79, 70, 229)
+  doc.rect(0, 0, pageWidth, 6, 'F')
+
+  // Super-title & Metadata Header
+  y += 10
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(79, 70, 229)
+  doc.text('AI STUDY COMPANION  •  EXECUTIVE SUMMARY', margin, y)
+
+  const dateStr = summary.generatedAt || new Date().toLocaleDateString('en-US', { dateStyle: 'medium' })
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(100, 116, 139)
+  doc.text(`Generated: ${dateStr}`, pageWidth - margin, y, { align: 'right' })
+
+  // Document Title
+  y += 24
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(20)
+  doc.setTextColor(15, 23, 42)
+  const title = summary.materialTitle || materialTitle || 'Document Summary'
+  const titleLines = doc.splitTextToSize(title, contentWidth)
+  doc.text(titleLines, margin, y)
+  y += titleLines.length * 22
+
+  // Key Concepts chips / bar
+  if (summary.keyConcepts && summary.keyConcepts.length > 0) {
+    ensureSpace(40)
+    y += 10
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(79, 70, 229)
+    doc.text('CORE CONCEPTS & DEFINITIONS', margin, y)
+    y += 14
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(51, 65, 85)
+    const conceptsText = summary.keyConcepts.join('  •  ')
+    const conceptsLines = doc.splitTextToSize(conceptsText, contentWidth)
+    doc.text(conceptsLines, margin, y)
+    y += conceptsLines.length * 13 + 12
+  }
+
+  // Divider
+  doc.setDrawColor(226, 232, 240)
+  doc.setLineWidth(1)
+  doc.line(margin, y, pageWidth - margin, y)
+  y += 18
+
+  // Sections
+  const sections = summary.sections || []
+  sections.forEach((sec, idx) => {
+    ensureSpace(60)
+
+    // Section Title
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.setTextColor(30, 41, 59)
+    doc.text(`${idx + 1}. ${sec.title}`, margin, y)
+    y += 18
+
+    // Section Body
+    if (sec.body) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9.5)
+      doc.setTextColor(71, 85, 105)
+      const bodyLines = doc.splitTextToSize(sec.body, contentWidth)
+      ensureSpace(bodyLines.length * 13 + 10)
+      doc.text(bodyLines, margin, y)
+      y += bodyLines.length * 13 + 8
+    }
+
+    // Section Points
+    if (sec.points && sec.points.length > 0) {
+      sec.points.forEach((pt) => {
+        const ptLines = doc.splitTextToSize(pt, contentWidth - 16)
+        ensureSpace(ptLines.length * 12 + 6)
+        doc.setFillColor(79, 70, 229)
+        doc.circle(margin + 5, y - 3, 2, 'F')
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(9)
+        doc.setTextColor(30, 41, 59)
+        doc.text(ptLines, margin + 14, y)
+        y += ptLines.length * 12 + 4
+      })
+    }
+
+    y += 14
+  })
+
+  // Footers
+  const totalPages = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(148, 163, 184)
+    doc.setDrawColor(226, 232, 240)
+    doc.setLineWidth(0.5)
+    doc.line(margin, pageHeight - margin + 10, pageWidth - margin, pageHeight - margin + 10)
+    doc.text('AI Study Companion • AI Generated Summary Notes', margin, pageHeight - margin + 22)
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - margin + 22, { align: 'right' })
+  }
+
+  const safeFilename = title.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40)
+  doc.save(`${safeFilename}_Summary.pdf`)
+}
+

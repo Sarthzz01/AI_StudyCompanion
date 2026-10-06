@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Send } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Send, Clock, BookOpen } from 'lucide-react'
 import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import ProgressBar from '../components/ProgressBar.jsx'
@@ -8,7 +8,13 @@ import QuizCard from '../components/QuizCard.jsx'
 import LoadingSpinner from '../components/LoadingSpinner.jsx'
 import ErrorState from '../components/ErrorState.jsx'
 import Modal from '../components/Modal.jsx'
-import { generateQuiz, submitQuiz, getMaterial } from '../services/api.js'
+import {
+  generateQuiz,
+  submitQuiz,
+  getMaterial,
+  getStudentAssessment,
+  submitStudentAssessment,
+} from '../services/api.js'
 import { useStudyData } from '../context/StudyDataContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -19,6 +25,11 @@ export default function QuizAttempt() {
   const toast = useToast()
   const { recordQuizAttempt } = useStudyData()
 
+  // Assessment mode params
+  const assessmentId = searchParams.get('assessment')
+  const assignmentId = searchParams.get('assignment')
+
+  // Practice quiz params
   const materialId = searchParams.get('material') || 'data-structures'
   const topic = searchParams.get('topic') || 'All topics'
   const difficulty = searchParams.get('difficulty') || 'mixed'
@@ -26,6 +37,7 @@ export default function QuizAttempt() {
 
   const [questions, setQuestions] = useState([])
   const [material, setMaterial] = useState(null)
+  const [assessmentMeta, setAssessmentMeta] = useState(null)
   const [answers, setAnswers] = useState({}) // questionId -> option index
   const [current, setCurrent] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -33,20 +45,39 @@ export default function QuizAttempt() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [attemptId, setAttemptId] = useState(null)
+  const [startTime] = useState(() => Date.now())
 
   const load = async () => {
     setLoading(true)
     setError(null)
     try {
-      const [qs, m] = await Promise.all([
-        generateQuiz({ materialId, topic, difficulty, count }),
-        getMaterial(materialId),
-      ])
-      setQuestions(qs)
-      setAttemptId(qs.attemptId || null)
-      setMaterial(m)
-      setAnswers({})
-      setCurrent(0)
+      if (assessmentId) {
+        // Instructor Assigned Assessment Mode
+        const assData = await getStudentAssessment(assessmentId)
+        setAssessmentMeta(assData)
+        const qs = (assData.questions || []).map((q, idx) => ({
+          id: q.id || idx + 1,
+          question: q.question_text || q.question,
+          options: q.options || [],
+          topic: assData.topic,
+          points: q.points || 10,
+        }))
+        setQuestions(qs)
+        setMaterial({ title: assData.title, isAssessment: true })
+        setAnswers({})
+        setCurrent(0)
+      } else {
+        // Self-Study Practice Quiz Mode
+        const [qs, m] = await Promise.all([
+          generateQuiz({ materialId, topic, difficulty, count }),
+          getMaterial(materialId),
+        ])
+        setQuestions(qs)
+        setAttemptId(qs.attemptId || null)
+        setMaterial(m)
+        setAnswers({})
+        setCurrent(0)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -57,7 +88,7 @@ export default function QuizAttempt() {
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, materialId, topic, difficulty, count])
+  }, [id, assessmentId, materialId, topic, difficulty, count])
 
   const select = (optionIndex) => {
     const question = questions[current]
@@ -66,6 +97,59 @@ export default function QuizAttempt() {
 
   const finish = async () => {
     setSubmitting(true)
+
+    if (assessmentId) {
+      // Submitting an Assigned Assessment
+      const timeSpentSeconds = Math.max(1, Math.floor((Date.now() - startTime) / 1000))
+      const payload = {
+        assignment_id: assignmentId ? Number(assignmentId) : null,
+        time_spent_seconds: timeSpentSeconds,
+        answers: questions.map((q) => ({
+          question_id: Number(q.id),
+          selected_option: answers[q.id] !== undefined ? Number(answers[q.id]) : -1,
+        })),
+      }
+
+      try {
+        const subResult = await submitStudentAssessment(assessmentId, payload)
+        const attempt = {
+          id: `submission-${subResult.id}`,
+          assessmentId: Number(assessmentId),
+          materialTitle: assessmentMeta?.title || 'Assigned Assessment',
+          topic: assessmentMeta?.topic || 'Assessment',
+          difficulty: assessmentMeta?.difficulty || 'medium',
+          score: subResult.score,
+          total: subResult.total_points,
+          accuracy: subResult.percentage,
+          passed: subResult.passed,
+          date: new Date().toISOString().slice(0, 10),
+          review: questions.map((q) => {
+            const graded = (subResult.answers || []).find((a) => a.question_id === q.id)
+            return {
+              id: q.id,
+              question: q.question,
+              topic: q.topic,
+              options: q.options,
+              selected: answers[q.id] ?? null,
+              answer: graded?.correct_answer ?? null,
+              correct: graded ? graded.is_correct : false,
+              explanation: graded?.explanation || 'Graded by instructor criteria.',
+            }
+          }),
+        }
+        await recordQuizAttempt(attempt)
+        toast('Assessment submitted successfully!', 'success')
+        navigate('/quiz-result', { state: { attempt } })
+      } catch (err) {
+        toast(err.message || 'The assessment could not be submitted. Try again.', 'error')
+      } finally {
+        setSubmitting(false)
+        setConfirmOpen(false)
+      }
+      return
+    }
+
+    // Submitting a Self-Study Practice Quiz
     const review = questions.map((q) => ({
       id: q.id,
       question: q.question,
@@ -80,7 +164,7 @@ export default function QuizAttempt() {
     const score = review.filter((r) => r.correct).length
     const total = review.length
 
-    // Per-topic tally drives the strong/weak lists and the progress charts.
+    // Per-topic tally drives the strong/weak lists and progress charts.
     const topicResults = {}
     review.forEach((r) => {
       topicResults[r.topic] = topicResults[r.topic] || { correct: 0, total: 0 }
@@ -125,7 +209,13 @@ export default function QuizAttempt() {
     }
   }
 
-  if (loading) return <LoadingSpinner label="Generating your questions…" />
+  if (loading) {
+    return (
+      <LoadingSpinner
+        label={assessmentId ? 'Preparing your official assessment questions…' : 'Generating your questions…'}
+      />
+    )
+  }
   if (error) return <ErrorState message={error} onRetry={load} />
 
   const question = questions[current]
@@ -136,9 +226,25 @@ export default function QuizAttempt() {
     <div className="mx-auto max-w-3xl">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="font-display text-xl font-semibold">{material?.title}</h1>
-          <p className="muted">
-            {topic} · {difficulty} · {questions.length} questions
+          <div className="flex items-center gap-2">
+            {assessmentId && (
+              <span className="flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-bold text-brand-700 dark:bg-brand-950/80 dark:text-brand-300">
+                <BookOpen size={12} /> Assigned Assessment
+              </span>
+            )}
+            <h1 className="font-display text-xl font-semibold">{material?.title}</h1>
+          </div>
+          <p className="muted mt-0.5 text-xs">
+            {assessmentId ? (
+              <>
+                {assessmentMeta?.topic} &middot; {assessmentMeta?.difficulty} &middot; {questions.length} questions
+                {assessmentMeta?.time_limit_minutes ? ` &middot; ${assessmentMeta.time_limit_minutes}m time limit` : ''}
+              </>
+            ) : (
+              <>
+                {topic} &middot; {difficulty} &middot; {questions.length} questions
+              </>
+            )}
           </p>
         </div>
         <span className="chip bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300">
@@ -153,7 +259,7 @@ export default function QuizAttempt() {
           question={question}
           index={current}
           total={questions.length}
-          selected={answers[question.id] ?? null}
+          selected={answers[question?.id] ?? null}
           onSelect={select}
         />
       </Card>
@@ -165,7 +271,7 @@ export default function QuizAttempt() {
 
         {isLast ? (
           <Button icon={Send} onClick={() => setConfirmOpen(true)} disabled={answeredCount === 0}>
-            Submit quiz
+            {assessmentId ? 'Submit Assessment' : 'Submit quiz'}
           </Button>
         ) : (
           <Button variant="secondary" onClick={() => setCurrent((c) => c + 1)}>
@@ -198,11 +304,13 @@ export default function QuizAttempt() {
       <Modal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        title="Submit this quiz?"
+        title={assessmentId ? 'Submit this assessment?' : 'Submit this quiz?'}
         description={
           answeredCount < questions.length
             ? `${questions.length - answeredCount} question(s) are still unanswered and will be marked wrong.`
-            : 'All questions are answered. Your score will be added to your progress.'
+            : assessmentId
+              ? 'All questions are answered. Your assessment will be graded and submitted to your instructor.'
+              : 'All questions are answered. Your score will be added to your progress.'
         }
         footer={
           <>
@@ -210,7 +318,7 @@ export default function QuizAttempt() {
               Keep working
             </Button>
             <Button onClick={finish} loading={submitting}>
-              Submit quiz
+              {assessmentId ? 'Confirm & Submit' : 'Submit quiz'}
             </Button>
           </>
         }

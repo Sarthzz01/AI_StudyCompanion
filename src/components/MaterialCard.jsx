@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { FileText, Clock, Layers, Trash2, ArrowUpRight } from 'lucide-react'
 import ProgressBar from './ProgressBar.jsx'
 import Button from './Button.jsx'
+import { formatRelativeTime } from '../utils/format.js'
 
 export default function MaterialCard({ material, onDelete }) {
   return (
@@ -44,8 +45,8 @@ export default function MaterialCard({ material, onDelete }) {
           <span className="inline-flex items-center gap-1.5">
             <FileText size={13} className="text-brand-500" /> {material.pages} pages
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Clock size={13} className="text-brand-500" /> {material.lastStudied}
+          <span className="inline-flex items-center gap-1.5" title={`Last studied: ${material.lastStudied || 'Not studied yet'}`}>
+            <Clock size={13} className="text-brand-500" /> {formatRelativeTime(material.lastStudied)}
           </span>
         </div>
 

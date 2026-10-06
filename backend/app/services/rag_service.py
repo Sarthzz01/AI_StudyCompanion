@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 from app.config import settings
 from app.services.ai_service import ai_service
+from app.services.openai_service import openai_service
 from app.models.document import DocumentChunk, Summary, TutorInteraction, SourceReference
 from app.models.material import Material
 from app.models.user import User
@@ -524,11 +525,23 @@ class RAGService:
         else:
             combined_text = f"Title: {mat.title}\nDescription: {mat.description}\nTopics: " + ", ".join([t.get("name", "") for t in (mat.topics_json or [])])
 
-        # 3. Call Gemini to create structured JSON summary
+        # 3. Call OpenAI or Gemini to create structured JSON summary
         key_concepts = []
         sections = []
 
-        if ai_service.is_configured() and ai_service.client:
+        # Try OpenAI (gpt-4o-mini) first
+        if openai_service.is_configured():
+            try:
+                ai_res = openai_service.generate_structured_summary(mat.title, combined_text)
+                if ai_res and ai_res.get("sections"):
+                    key_concepts = ai_res.get("keyConcepts", [])
+                    sections = ai_res.get("sections", [])
+                    logger.info(f"Generated structured AI summary with OpenAI for '{mat.title}'")
+            except Exception as e:
+                logger.error(f"Error generating structured summary with OpenAI: {e}")
+
+        # Fallback to Gemini if OpenAI did not produce sections
+        if not sections and ai_service.is_configured() and ai_service.client:
             prompt = (
                 f"You are an academic curriculum specialist. Generate an in-depth structured study summary of the following document:\n\n"
                 f"Document Title: {mat.title}\n"
@@ -574,7 +587,7 @@ class RAGService:
             except Exception as e:
                 logger.error(f"Error generating structured summary with Gemini: {e}")
 
-        # Fallback if Gemini unavailable or returned empty
+        # Fallback if both LLMs unavailable or returned empty
         if not sections:
             key_concepts = [f"{mat.title} Overview", "Key Principles", "Methodologies", "Best Practices"]
             sections = [

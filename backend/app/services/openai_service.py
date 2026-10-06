@@ -284,4 +284,81 @@ class OpenAIService:
             return " ".join(words[:5]).title()
         return clean.title() if clean else "Study Discussion"
 
+    def generate_structured_summary(
+        self,
+        title: str,
+        text: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generates an in-depth, structured academic summary using OpenAI gpt-4o-mini.
+        Returns a dict: { "keyConcepts": [...], "sections": [{ "id": "s1", "title": "...", "body": "...", "points": [...] }] }
+        """
+        if not self.is_configured():
+            return None
+
+        client = self.client
+        if not client:
+            return None
+
+        try:
+            import json
+            prompt = (
+                f"You are an expert academic curriculum summarizer. "
+                f"Analyze the following study material text extracted from the document titled '{title}'.\n\n"
+                f"Document Content Excerpts:\n{text[:14000]}\n\n"
+                f"Generate a comprehensive, structured study summary strictly formatted as a JSON object with the following schema:\n"
+                f"{{\n"
+                f'  "keyConcepts": ["4 to 8 high-yield core concepts or definitions"],\n'
+                f'  "sections": [\n'
+                f'    {{\n'
+                f'      "id": "s1",\n'
+                f'      "title": "Clear Section Heading",\n'
+                f'      "body": "Thorough, clear paragraph explaining the core ideas, mechanisms, or theories from this section.",\n'
+                f'      "points": [\n'
+                f'        "High-yield takeaway 1",\n'
+                f'        "Key equation, rule, or mechanism 2",\n'
+                f'        "Critical exam/practical application point 3"\n'
+                f'      ]\n'
+                f'    }}\n'
+                f'  ]\n'
+                f"}}\n"
+                f"Include 3 to 6 comprehensive sections that fully represent the document."
+            )
+
+            completion = client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a distinguished academic educator. Generate thorough, accurate, structured study notes strictly as valid JSON."
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.3,
+            )
+
+            raw_text = completion.choices[0].message.content or "{}"
+            parsed = json.loads(raw_text)
+            key_concepts = parsed.get("keyConcepts", [])
+            raw_sections = parsed.get("sections", [])
+            sections = []
+            for i, sec in enumerate(raw_sections):
+                sections.append({
+                    "id": sec.get("id") or f"s{i+1}",
+                    "title": sec.get("title", f"Section {i+1}"),
+                    "body": sec.get("body", ""),
+                    "points": sec.get("points", [])
+                })
+
+            if sections:
+                return {
+                    "keyConcepts": key_concepts,
+                    "sections": sections
+                }
+        except Exception as e:
+            logger.error(f"Error generating structured summary with OpenAI: {e}")
+
+        return None
+
 openai_service = OpenAIService()
